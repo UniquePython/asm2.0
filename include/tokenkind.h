@@ -11,6 +11,6 @@ typedef enum tokenkind_t
     TK_EOF,
 } TokenKind;
 
-const char *GetTokenKindName(TokenKind tk);
+const char *TokenKindAsStr(TokenKind tk);
 
 #endif /* TOKENKIND_H_ */

@@ -1,6 +1,6 @@
 #include "tokenkind.h"
 
-const char *GetTokenKindName(TokenKind tk)
+const char *TokenKindAsStr(TokenKind tk)
 {
     switch (tk)
     {
