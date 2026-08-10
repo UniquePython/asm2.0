@@ -1,5 +1,7 @@
 #include "source.h"
 
+#include "mem.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,12 +31,7 @@ bool SourceLoad(const char *filepath, Source *out)
         return false;
     }
 
-    char *data = malloc((u32)fileLen + 1);
-    if (!data)
-    {
-        fclose(file);
-        return false;
-    }
+    char *data = alloc((u32)fileLen + 1);
 
     u32 len = (u32)fileLen;
 
@@ -51,12 +48,7 @@ bool SourceLoad(const char *filepath, Source *out)
 
     usize filepathLen = strlen(filepath);
 
-    char *filepathCopy = malloc(filepathLen + 1);
-    if (!filepathCopy)
-    {
-        free(data);
-        return false;
-    }
+    char *filepathCopy = alloc(filepathLen + 1);
 
     memcpy(filepathCopy, filepath, filepathLen + 1);
 
