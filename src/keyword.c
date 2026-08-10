@@ -40,6 +40,7 @@ const char *KeywordAsStr(Keyword kw)
     case KW_SYSCALL:
         return "syscall";
 
+    case NKWS:
     default:
         return "unknown";
     }
