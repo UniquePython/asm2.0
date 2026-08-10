@@ -34,34 +34,12 @@ static const char *ResetColor(void)
     return DiagnosticUseColor() ? ANSI_RESET : "";
 }
 
-void Error(const char *fmt, ...)
+static void ReportSimple(const char *prefix, int exitCode, const char *fmt, va_list args)
 {
-    va_list args;
-
-    fprintf(stderr, "%serror:%s ", Color(ANSI_RED), ResetColor());
-
-    va_start(args, fmt);
+    fprintf(stderr, "%s%s:%s ", Color(ANSI_RED), prefix, ResetColor());
     vfprintf(stderr, fmt, args);
-    va_end(args);
-
     fputc('\n', stderr);
-
-    exit(1);
-}
-
-void InternalError(const char *fmt, ...)
-{
-    va_list args;
-
-    fprintf(stderr, "%sinternal error:%s ", Color(ANSI_RED), ResetColor());
-
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-
-    fputc('\n', stderr);
-
-    exit(2);
+    exit(exitCode);
 }
 
 static void PositionFromOffset(const Source *source, u32 offset, u32 *line, u32 *col)
@@ -112,21 +90,16 @@ static void PrintGutter(FILE *out, u32 line, u32 width, bool with_number)
         fprintf(out, "%*s | ", (int)width, "");
 }
 
-void LexError(const Source *source, Span span, const char *fmt, ...)
+static void ReportPositioned(const char *prefix, int exitCode, const Source *source, Span span, const char *fmt, va_list args)
 {
     u32 line;
     u32 col;
 
     PositionFromOffset(source, span.start, &line, &col);
 
-    /* lexer error: <formatted message> */
-    fprintf(stderr, "%slexer error:%s ", Color(ANSI_RED), ResetColor());
-
-    va_list args;
-    va_start(args, fmt);
+    /* <prefix>: <formatted message> */
+    fprintf(stderr, "%s%s:%s ", Color(ANSI_RED), prefix, ResetColor());
     vfprintf(stderr, fmt, args);
-    va_end(args);
-
     fputc('\n', stderr);
 
     /* --> filepath:line:col */
@@ -146,7 +119,6 @@ void LexError(const Source *source, Span span, const char *fmt, ...)
 
     /* Calculate gutter width. */
     u32 gutterWidth = 1;
-
     for (u32 n = line; n >= 10; n /= 10)
         gutterWidth++;
 
@@ -174,11 +146,40 @@ void LexError(const Source *source, Span span, const char *fmt, ...)
         spanLen = 1;
 
     fprintf(stderr, "%s", Color(ANSI_RED));
-
     for (u32 i = 0; i < spanLen; i++)
         fputc('^', stderr);
-
     fprintf(stderr, "%s\n", ResetColor());
+    exit(exitCode);
+}
 
-    exit(3);
+void Error(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ReportSimple("error", 2, fmt, args);
+    va_end(args);
+}
+
+void InternalError(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ReportSimple("internal error", 1, fmt, args);
+    va_end(args);
+}
+
+void LexError(const Source *source, Span span, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ReportPositioned("lexer error", 3, source, span, fmt, args);
+    va_end(args);
+}
+
+void ParseError(const Source *source, Span span, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ReportPositioned("parser error", 4, source, span, fmt, args);
+    va_end(args);
 }
