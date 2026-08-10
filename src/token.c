@@ -2,56 +2,44 @@
 
 #include <stdio.h>
 
-Token NewIdentifierToken(char *identifier, u32 start, u32 end)
+Token NewIdentifierToken(char *identifier, Span span)
 {
     return (Token){
         .tk = TK_IDENTIFIER,
-        .span = {
-            .start = start,
-            .end = end,
-        },
+        .span = span,
         .as.identifier = identifier,
     };
 }
 
-Token NewKeywordToken(Keyword keyword, u32 start, u32 end)
+Token NewKeywordToken(Keyword keyword, Span span)
 {
     return (Token){
         .tk = TK_KEYWORD,
-        .span = {
-            .start = start,
-            .end = end,
-        },
+        .span = span,
         .as.keyword = keyword,
     };
 }
 
-Token NewNumberToken(u64 number, u32 start, u32 end)
+Token NewNumberToken(u64 number, Span span)
 {
     return (Token){
         .tk = TK_NUMBER,
-        .span = {
-            .start = start,
-            .end = end,
-        },
+        .span = span,
         .as.number = number,
     };
 }
 
-Token NewSimpleToken(TokenKind tk, u32 start, u32 end)
+Token NewSimpleToken(TokenKind tk, Span span)
 {
     return (Token){
         .tk = tk,
-        .span = {
-            .start = start,
-            .end = end,
-        },
+        .span = span,
     };
 }
 
 Token NewEOFToken(u32 start)
 {
-    return NewSimpleToken(TK_EOF, start, start);
+    return NewSimpleToken(TK_EOF, (Span){.start = start, .end = start});
 }
 
 #define SPAN_FMT " @" U32_FMT ":" U32_FMT

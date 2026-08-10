@@ -19,10 +19,10 @@ typedef struct token_t
     } as;
 } Token;
 
-Token NewIdentifierToken(char *identifier, u32 start, u32 end);
-Token NewKeywordToken(Keyword keyword, u32 start, u32 end);
-Token NewNumberToken(u64 number, u32 start, u32 end);
-Token NewSimpleToken(TokenKind tk, u32 start, u32 end);
+Token NewIdentifierToken(char *identifier, Span span);
+Token NewKeywordToken(Keyword keyword, Span span);
+Token NewNumberToken(u64 number, Span span);
+Token NewSimpleToken(TokenKind tk, Span span);
 Token NewEOFToken(u32 start);
 
 usize TokenAsStrLen(const Token *token);

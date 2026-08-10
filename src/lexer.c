@@ -66,7 +66,7 @@ static Token LexIdentifierOrKeyword(const Source *source, u32 *pos)
     Keyword kw;
 
     if (StrToKeyword(source->data + start, SpanLength(span), &kw))
-        return NewKeywordToken(kw, span.start, span.end);
+        return NewKeywordToken(kw, span);
 
     usize len = SpanLength(span);
     char *copy = alloc(len + 1);
@@ -74,7 +74,7 @@ static Token LexIdentifierOrKeyword(const Source *source, u32 *pos)
     memcpy(copy, source->data + start, len);
     copy[len] = '\0';
 
-    return NewIdentifierToken(copy, span.start, span.end);
+    return NewIdentifierToken(copy, span);
 }
 
 static Token LexNumber(const Source *source, u32 *pos)
@@ -98,7 +98,7 @@ static Token LexNumber(const Source *source, u32 *pos)
         .end = *pos,
     };
 
-    return NewNumberToken(value, span.start, span.end);
+    return NewNumberToken(value, span);
 }
 
 TokenNode *Lex(const Source *source)
@@ -131,12 +131,12 @@ TokenNode *Lex(const Source *source)
                 token = LexNumber(source, &pos);
             else if (ch == ':')
             {
-                token = NewSimpleToken(TK_COLON, pos, pos + 1);
+                token = NewSimpleToken(TK_COLON, (Span){.start = pos, .end = pos + 1});
                 pos += 1;
             }
             else if (ch == ';')
             {
-                token = NewSimpleToken(TK_SEMICOLON, pos, pos + 1);
+                token = NewSimpleToken(TK_SEMICOLON, (Span){.start = pos, .end = pos + 1});
                 pos += 1;
             }
             else
