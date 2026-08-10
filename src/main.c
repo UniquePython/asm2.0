@@ -5,6 +5,8 @@
 #include "lexer.h"
 #include "source.h"
 #include "token.h"
+#include "stmt.h"
+#include "parser.h"
 
 int main(int argc, char **argv)
 {
@@ -16,12 +18,24 @@ int main(int argc, char **argv)
         Error("failed to load %s", argv[1]);
 
     TokenNode *tokens = Lex(&source);
+    printf("Tokens:\n");
     for (TokenNode *tnode = tokens; tnode; tnode = tnode->next)
     {
         usize len = TokenAsStrLen(&tnode->token);
         char *buf = alloc(len);
         TokenAsStr(&tnode->token, buf);
         printf("%s\n", buf);
+        free(buf);
+    }
+
+    printf("\nAST:\n");
+    StmtNode *stmts = Parse(&source, tokens);
+    for (StmtNode *snode = stmts; snode; snode = snode->next)
+    {
+        usize len = StmtAsStrLen(&snode->stmt);
+        char *buf = alloc(len);
+        StmtAsStr(&snode->stmt, buf);
+        printf(" %s\n", buf);
         free(buf);
     }
 
