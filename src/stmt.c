@@ -52,8 +52,8 @@ static int StmtFormat(const Stmt *stmt, char *buffer, usize len)
         usize srcLen = OperandAsStrLen(&stmt->as.move.src);
         usize destLen = OperandAsStrLen(&stmt->as.move.dest);
 
-        char *srcStr = alloc(srcLen);
-        char *destStr = alloc(destLen);
+        char *srcStr = Alloc(srcLen);
+        char *destStr = Alloc(destLen);
 
         OperandAsStr(&stmt->as.move.src, srcStr);
         OperandAsStr(&stmt->as.move.dest, destStr);

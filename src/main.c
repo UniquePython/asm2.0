@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     for (TokenNode *tnode = tokens; tnode; tnode = tnode->next)
     {
         usize len = TokenAsStrLen(&tnode->token);
-        char *buf = alloc(len);
+        char *buf = Alloc(len);
         TokenAsStr(&tnode->token, buf);
         printf("%s\n", buf);
         free(buf);
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     for (StmtNode *snode = stmts; snode; snode = snode->next)
     {
         usize len = StmtAsStrLen(&snode->stmt);
-        char *buf = alloc(len);
+        char *buf = Alloc(len);
         StmtAsStr(&snode->stmt, buf);
         printf(" %s\n", buf);
         free(buf);

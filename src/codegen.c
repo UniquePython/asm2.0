@@ -34,7 +34,7 @@ static Encoded EncodeLabelStmt(void)
  */
 static Encoded EncodeSyscallStmt(void)
 {
-    u8 *bytes = alloc(2);
+    u8 *bytes = Alloc(2);
     bytes[0] = 0x0F;
     bytes[1] = 0x05;
 
@@ -63,7 +63,7 @@ static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
     if (src->as.number > UINT32_MAX)
         CodegenError(source, src->span, "immediate value is too large to fit in 32 bits");
 
-    u8 *bytes = alloc(5);
+    u8 *bytes = Alloc(5);
     bytes[0] = (u8)(0xB8 + (u8)destReg);
 
     u32 imm = (u32)src->as.number;

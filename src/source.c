@@ -31,7 +31,7 @@ bool SourceLoad(const char *filepath, Source *out)
         return false;
     }
 
-    char *data = alloc((u32)fileLen + 1);
+    char *data = Alloc((u32)fileLen + 1);
 
     u32 len = (u32)fileLen;
 
@@ -48,7 +48,7 @@ bool SourceLoad(const char *filepath, Source *out)
 
     usize filepathLen = strlen(filepath);
 
-    char *filepathCopy = alloc(filepathLen + 1);
+    char *filepathCopy = Alloc(filepathLen + 1);
 
     memcpy(filepathCopy, filepath, filepathLen + 1);
 

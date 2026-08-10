@@ -69,7 +69,7 @@ static Token LexIdentifierOrKeyword(const Source *source, u32 *pos)
         return NewKeywordToken(kw, span);
 
     usize len = SpanLength(span);
-    char *copy = alloc(len + 1);
+    char *copy = Alloc(len + 1);
 
     memcpy(copy, source->data + start, len);
     copy[len] = '\0';
@@ -148,7 +148,7 @@ TokenNode *Lex(const Source *source)
             }
         }
 
-        TokenNode *node = alloc(sizeof(*node));
+        TokenNode *node = Alloc(sizeof(*node));
         *node = (TokenNode){
             .token = token,
             .next = NULL,

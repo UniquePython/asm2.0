@@ -26,7 +26,7 @@ void ByteBufWriteU8(ByteBuf *buf, u8 value)
     if (buf->len == buf->cap)
     {
         usize newCap = buf->cap == 0 ? BYTEBUF_INITIAL_CAP : buf->cap * 2;
-        buf->data = realloc_(buf->data, newCap);
+        buf->data = Realloc(buf->data, newCap);
         buf->cap = newCap;
     }
 

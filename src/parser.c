@@ -163,7 +163,7 @@ StmtNode *Parse(const Source *source, TokenNode *tokens)
     {
         Stmt stmt = ParseStmt(&p);
 
-        StmtNode *node = alloc(sizeof(*node));
+        StmtNode *node = Alloc(sizeof(*node));
 
         *node = (StmtNode){
             .stmt = stmt,

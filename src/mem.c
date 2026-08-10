@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-void *alloc(usize size)
+void *Alloc(usize size)
 {
     void *ptr = malloc(size);
     if (!ptr)
@@ -11,7 +11,7 @@ void *alloc(usize size)
     return ptr;
 }
 
-void *realloc_(void *ptr, usize size)
+void *Realloc(void *ptr, usize size)
 {
     void *newPtr = realloc(ptr, size);
     if (!newPtr)
