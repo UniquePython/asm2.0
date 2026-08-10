@@ -29,14 +29,14 @@ bool SourceLoad(const char *filepath, Source *out)
         return false;
     }
 
-    char *data = malloc((usize)fileLen + 1);
+    char *data = malloc((u32)fileLen + 1);
     if (!data)
     {
         fclose(file);
         return false;
     }
 
-    usize len = (usize)fileLen;
+    u32 len = (u32)fileLen;
 
     if (fread(data, 1, len, file) != len)
     {
