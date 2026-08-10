@@ -17,8 +17,7 @@ cd asm2.0
 
 Build the project:
 ```bash
-make clean
-make build
+make clean && make
 ```
 
 Run:
