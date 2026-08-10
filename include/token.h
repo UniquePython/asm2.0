@@ -13,11 +13,17 @@ typedef struct token_t
 
     union token_as_t
     {
+        const char *identifier;
         Keyword keyword;
         u64 number;
-        const char *identifier;
     } as;
 } Token;
+
+Token NewIdentifierToken(const char *identifier, u32 start, u32 end);
+Token NewKeywordToken(Keyword keyword, u32 start, u32 end);
+Token NewNumberToken(u64 number, u32 start, u32 end);
+Token NewSimpleToken(TokenKind tk, u32 start, u32 end);
+Token NewEOFToken(u32 start);
 
 usize TokenAsStrLen(const Token *token);
 bool TokenAsStr(const Token *token, char *buffer);

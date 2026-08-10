@@ -2,6 +2,58 @@
 
 #include <stdio.h>
 
+Token NewIdentifierToken(const char *identifier, u32 start, u32 end)
+{
+    return (Token){
+        .tk = TK_IDENTIFIER,
+        .span = {
+            .start = start,
+            .end = end,
+        },
+        .as.identifier = identifier,
+    };
+}
+
+Token NewKeywordToken(Keyword keyword, u32 start, u32 end)
+{
+    return (Token){
+        .tk = TK_KEYWORD,
+        .span = {
+            .start = start,
+            .end = end,
+        },
+        .as.keyword = keyword,
+    };
+}
+
+Token NewNumberToken(u64 number, u32 start, u32 end)
+{
+    return (Token){
+        .tk = TK_NUMBER,
+        .span = {
+            .start = start,
+            .end = end,
+        },
+        .as.number = number,
+    };
+}
+
+Token NewSimpleToken(TokenKind tk, u32 start, u32 end)
+{
+    return (Token){
+        .tk = tk,
+        .span = {
+            .start = start,
+            .end = end,
+        },
+    };
+}
+
+Token NewEOFToken(u32 start)
+{
+    return NewSimpleToken(TK_EOF, start, start);
+}
+
 #define SPAN_FMT " @" U32_FMT ":" U32_FMT
 #define SPAN_ARG(span) (span).start, (span).end
 static int TokenFormat(const Token *token, char *buffer, usize len)
