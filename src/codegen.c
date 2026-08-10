@@ -1,6 +1,7 @@
 #include "codegen.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "diagnostic.h"
 #include "mem.h"
@@ -15,6 +16,15 @@ Register ResolveRegisterOperand(const Source *source, const Operand *operand)
         CodegenError(source, operand->span, "unknown register '%s'", operand->as.identifier);
 
     return reg;
+}
+
+// Nothing to emit
+static Encoded EncodeEntryStmt(void)
+{
+    return (Encoded){
+        .bytes = NULL,
+        .len = 0,
+    };
 }
 
 /*
@@ -78,6 +88,54 @@ static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
     };
 }
 
+typedef struct label_entry_t
+{
+    const char *name;
+    usize offset;
+} LabelEntry;
+
+typedef struct label_table_t
+{
+    LabelEntry *entries;
+    usize len;
+} LabelTable;
+
+static usize CountLabels(const StmtNode *stmts)
+{
+    usize count = 0;
+
+    for (const StmtNode *node = stmts; node; node = node->next)
+        if (node->stmt.kind == STMT_LABEL)
+            count++;
+
+    return count;
+}
+
+static bool LabelTableFind(const LabelTable *table, const char *name, usize *outOffset)
+{
+    for (usize i = 0; i < table->len; i++)
+    {
+        if (strcmp(table->entries[i].name, name) == 0)
+        {
+            *outOffset = table->entries[i].offset;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void LabelTableFree(LabelTable *table)
+{
+    if (!table)
+        return;
+
+    free(table->entries);
+
+    table->entries = NULL;
+    table->len = 0;
+}
+
 Encoded EncodeStmt(const Source *source, const Stmt *stmt)
 {
     switch (stmt->kind)
@@ -91,10 +149,76 @@ Encoded EncodeStmt(const Source *source, const Stmt *stmt)
     case STMT_MOVE:
         return EncodeMoveStmt(source, stmt);
 
+    case STMT_ENTRY:
+        return EncodeEntryStmt();
+
     default:
         InternalError("unknown statement kind in EncodeStmt");
     }
 
     /* Unreachable: InternalError does not return. */
     return (Encoded){.bytes = NULL, .len = 0};
+}
+
+CodegenResult GenerateCode(const Source *source, const StmtNode *stmts)
+{
+    usize labelCount = CountLabels(stmts);
+
+    LabelTable table = {
+        .entries = labelCount > 0 ? Alloc(labelCount * sizeof(LabelEntry)) : NULL,
+        .len = 0,
+    };
+
+    ByteBuf code;
+    ByteBufInit(&code);
+
+    /* First pass: encode code and build label table. */
+    for (const StmtNode *node = stmts; node; node = node->next)
+    {
+        const Stmt *stmt = &node->stmt;
+
+        if (stmt->kind == STMT_LABEL)
+            table.entries[table.len++] = (LabelEntry){
+                .name = stmt->as.label.name,
+                .offset = code.len,
+            };
+
+        if (stmt->kind == STMT_ENTRY)
+            continue;
+
+        Encoded encoded = EncodeStmt(source, stmt);
+
+        for (usize i = 0; i < encoded.len; i++)
+            ByteBufWriteU8(&code, encoded.bytes[i]);
+
+        free(encoded.bytes);
+    }
+
+    /* Second pass: resolve the entry label. */
+    const Stmt *entry = NULL;
+    u64 entryOffset = 0;
+
+    for (const StmtNode *node = stmts; node; node = node->next)
+    {
+        if (node->stmt.kind != STMT_ENTRY)
+            continue;
+
+        if (entry)
+            CodegenError(source, node->stmt.span, "multiple entry statements");
+
+        entry = &node->stmt;
+    }
+
+    if (!entry)
+        CodegenError(source, (Span){.start = 0, .end = 0}, "no entry statement");
+
+    if (!LabelTableFind(&table, entry->as.entry.label, &entryOffset))
+        CodegenError(source, entry->span, "entry refers to undefined label '%s'", entry->as.entry.label);
+
+    LabelTableFree(&table);
+
+    return (CodegenResult){
+        .code = code,
+        .entryOffset = entryOffset,
+    };
 }
