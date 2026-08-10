@@ -170,3 +170,24 @@ TokenNode *Lex(const Source *source)
 
     return head;
 }
+
+void LexFree(TokenNode **head)
+{
+    if (!head)
+        return;
+
+    TokenNode *node = *head;
+
+    while (node)
+    {
+        TokenNode *next = node->next;
+
+        if (node->token.tk == TK_IDENTIFIER)
+            free(node->token.as.identifier);
+
+        free(node);
+        node = next;
+    }
+
+    *head = NULL;
+}

@@ -9,23 +9,24 @@
 int main(int argc, char **argv)
 {
     if (argc < 2)
-        Error("usage: %s <file>\n", argv[0]);
+        Error("usage: %s <file>", argv[0]);
 
     Source source;
     if (!SourceLoad(argv[1], &source))
-        Error("failed to load %s\n", argv[1]);
+        Error("failed to load %s", argv[1]);
 
-    TokenNode *node = Lex(&source);
-
-    while (node)
+    TokenNode *tokens = Lex(&source);
+    for (TokenNode *tnode = tokens; tnode; tnode = tnode->next)
     {
-        usize len = TokenAsStrLen(&node->token);
+        usize len = TokenAsStrLen(&tnode->token);
         char *buf = alloc(len);
-        TokenAsStr(&node->token, buf);
+        TokenAsStr(&tnode->token, buf);
         printf("%s\n", buf);
         free(buf);
-        node = node->next;
     }
+
+    LexFree(&tokens);
+    SourceFree(&source);
 
     return 0;
 }

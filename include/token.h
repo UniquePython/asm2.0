@@ -13,7 +13,7 @@ typedef struct token_t
 
     union token_as_t
     {
-        const char *identifier;
+        char *identifier;
         Keyword keyword;
         u64 number;
     } as;

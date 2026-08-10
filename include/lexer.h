@@ -12,5 +12,6 @@ typedef struct token_node_t
 } TokenNode;
 
 TokenNode *Lex(const Source *source);
+void LexFree(TokenNode **head);
 
 #endif /* LEXER_H_ */
