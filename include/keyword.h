@@ -9,6 +9,7 @@ typedef enum keyword_t
     KW_MOVE,
     KW_TO,
     KW_SYSCALL,
+    KW_ENTRY,
     NKWS,
 } Keyword;
 

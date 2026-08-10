@@ -24,12 +24,19 @@ typedef struct stmt_t
             Operand src;
             Operand dest;
         } move;
+
+        struct
+        {
+            const char *label;
+            Span labelSpan;
+        } entry;
     } as;
 } Stmt;
 
 Stmt NewLabelStmt(const char *name, Span nameSpan, Span span);
 Stmt NewMoveStmt(Operand src, Operand dest, Span span);
 Stmt NewSyscallStmt(Span span);
+Stmt NewEntryStmt(const char *label, Span labelSpan, Span span);
 
 usize StmtAsStrLen(const Stmt *stmt);
 bool StmtAsStr(const Stmt *stmt, char *buffer);

@@ -37,6 +37,18 @@ Stmt NewSyscallStmt(Span span)
     };
 }
 
+Stmt NewEntryStmt(const char *label, Span labelSpan, Span span)
+{
+    return (Stmt){
+        .kind = STMT_ENTRY,
+        .span = span,
+        .as.entry = {
+            .label = label,
+            .labelSpan = labelSpan,
+        },
+    };
+}
+
 #define SPAN_FMT " @" U32_FMT ":" U32_FMT
 #define SPAN_ARG(span) (span).start, (span).end
 static int StmtFormat(const Stmt *stmt, char *buffer, usize len)
@@ -69,6 +81,10 @@ static int StmtFormat(const Stmt *stmt, char *buffer, usize len)
 
     case STMT_SYSCALL:
         return snprintf(buffer, len, "Stmt syscall" SPAN_FMT, SPAN_ARG(stmt->span));
+
+    case STMT_ENTRY:
+        return snprintf(buffer, len, "Stmt entry(\"%s\")" SPAN_FMT,
+                        stmt->as.entry.label, SPAN_ARG(stmt->span));
 
     default:
         return snprintf(buffer, len, "Stmt %s" SPAN_FMT, "unknown", SPAN_ARG(stmt->span));

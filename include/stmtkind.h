@@ -6,6 +6,7 @@ typedef enum stmt_kind_t
     STMT_LABEL,
     STMT_MOVE,
     STMT_SYSCALL,
+    STMT_ENTRY,
 } StmtKind;
 
 const char *StmtKindAsStr(StmtKind kind);

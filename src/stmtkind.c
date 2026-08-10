@@ -13,6 +13,9 @@ const char *StmtKindAsStr(StmtKind kind)
     case STMT_SYSCALL:
         return "syscall";
 
+    case STMT_ENTRY:
+        return "entry";
+
     default:
         return "unknown";
     }

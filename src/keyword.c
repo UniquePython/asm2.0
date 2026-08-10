@@ -7,6 +7,7 @@ static const char *keywords[] = {
     "move",
     "to",
     "syscall",
+    "entry",
 };
 
 bool StrToKeyword(const char *str, usize len, Keyword *out)
@@ -39,6 +40,9 @@ const char *KeywordAsStr(Keyword kw)
 
     case KW_SYSCALL:
         return "syscall";
+
+    case KW_ENTRY:
+        return "entry";
 
     case NKWS:
     default:

@@ -128,6 +128,23 @@ static Stmt ParseSyscallStmt(Parser *p)
     return NewSyscallStmt(span);
 }
 
+/*
+ * entry_decl  ::= "entry" IDENTIFIER ";"
+ */
+static Stmt ParseEntryStmt(Parser *p)
+{
+    Token entryTok = ParserExpectKeyword(p, KW_ENTRY);
+    Token labelTok = ParserExpect(p, TK_IDENTIFIER);
+    Token semicolonTok = ParserExpect(p, TK_SEMICOLON);
+
+    Span span = {
+        .start = entryTok.span.start,
+        .end = semicolonTok.span.end,
+    };
+
+    return NewEntryStmt(labelTok.as.identifier, labelTok.span, span);
+}
+
 static Stmt ParseStmt(Parser *p)
 {
     if (ParserCheckKeyword(p, KW_LABEL))
@@ -138,6 +155,9 @@ static Stmt ParseStmt(Parser *p)
 
     if (ParserCheckKeyword(p, KW_SYSCALL))
         return ParseSyscallStmt(p);
+
+    if (ParserCheckKeyword(p, KW_ENTRY))
+        return ParseEntryStmt(p);
 
     Token tok = ParserPeek(p);
     ParseError(p->source, tok.span, "expected statement, got %s", TokenKindAsStr(tok.tk));
