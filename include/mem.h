@@ -4,5 +4,6 @@
 #include "types.h"
 
 void *alloc(usize size);
+void *realloc_(void *ptr, usize size);
 
 #endif /* MEM_H_ */
