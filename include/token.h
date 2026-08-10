@@ -19,4 +19,7 @@ typedef struct token_t
     } as;
 } Token;
 
+usize TokenAsStrLen(const Token *token);
+bool TokenAsStr(const Token *token, char *buffer);
+
 #endif /* TOKEN_H_ */
