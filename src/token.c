@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-Token NewIdentifierToken(const char *identifier, u32 start, u32 end)
+Token NewIdentifierToken(char *identifier, u32 start, u32 end)
 {
     return (Token){
         .tk = TK_IDENTIFIER,
