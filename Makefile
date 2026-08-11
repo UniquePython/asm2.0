@@ -41,7 +41,7 @@ CFLAGS += -Iinclude
 # Not needed rn, but still there in case we need it later
 LDLIBS := 
 
-.PHONY: all clean run rebuild
+.PHONY: all clean run rebuild test
 
 all: $(TARGET)
 
@@ -62,3 +62,6 @@ clean:
 	@rm -rf build bin
 
 rebuild: clean all
+
+test:
+	@./tests/run.sh
