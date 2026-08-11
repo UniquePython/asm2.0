@@ -7,6 +7,7 @@ OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
 DEP := $(OBJ:.o=.d)
 
 WARNINGS := \
+	-Werror \
 	-Wall \
 	-Wextra \
 	-Wpedantic \

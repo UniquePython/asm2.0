@@ -1,5 +1,7 @@
 # asm2.0
 
+[![CI](https://github.com/UniquePython/asm2.0/actions/workflows/ci.yml/badge.svg)](https://github.com/UniquePython/asm2.0/actions/workflows/ci.yml)
+
 The future of asm.
 
 ## Quick Start
