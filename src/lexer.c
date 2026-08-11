@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "mem.h"
-#include "diagnostic.h"
 #include "keyword.h"
 
 static u32 SkipWhitespace(const Source *source, u32 pos)
@@ -76,19 +75,24 @@ static Token LexIdentifierOrKeyword(const Source *source, u32 *pos)
     return NewIdentifierToken(copy, span);
 }
 
-static Token LexNumber(const Source *source, u32 *pos)
+static Token LexNumber(const Source *source, u32 *pos, Diags *diags)
 {
     u32 start = *pos;
     u64 value = 0;
+    bool overflowed = false;
 
     while (*pos < source->len && source->data[*pos] >= '0' && source->data[*pos] <= '9')
     {
         u64 digit = (u64)(source->data[*pos] - '0');
 
-        if (value > (UINT64_MAX - digit) / 10)
-            LexError(source, (Span){.start = start, .end = *pos + 1}, "integer literal is too large");
+        if (!overflowed)
+        {
+            if (value > (UINT64_MAX - digit) / 10)
+                overflowed = true;
+            else
+                value = value * 10 + digit;
+        }
 
-        value = value * 10 + digit;
         (*pos)++;
     }
 
@@ -97,10 +101,13 @@ static Token LexNumber(const Source *source, u32 *pos)
         .end = *pos,
     };
 
+    if (overflowed)
+        DiagsPush(diags, span, "integer literal is too large");
+
     return NewNumberToken(value, span);
 }
 
-TokenNode *Lex(const Source *source)
+TokenNode *Lex(const Source *source, Diags *diags)
 {
     u32 pos = 0;
     TokenNode *head = NULL;
@@ -127,7 +134,7 @@ TokenNode *Lex(const Source *source)
             if (IsIdentStart(ch))
                 token = LexIdentifierOrKeyword(source, &pos);
             else if (ch >= '0' && ch <= '9')
-                token = LexNumber(source, &pos);
+                token = LexNumber(source, &pos, diags);
             else if (ch == ':')
             {
                 token = NewSimpleToken(TK_COLON, (Span){.start = pos, .end = pos + 1});
@@ -141,9 +148,9 @@ TokenNode *Lex(const Source *source)
             else
             {
                 Span badSpan = {.start = pos, .end = pos + 1};
-                LexError(source, badSpan, "unexpected character '%c'", ch);
-                /* unreachable: LexError never returns */
-                token = NewEOFToken(pos);
+                DiagsPush(diags, badSpan, "unexpected character '%c'", ch);
+                pos += 1;
+                continue;
             }
         }
 

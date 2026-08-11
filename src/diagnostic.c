@@ -90,17 +90,20 @@ static void PrintGutter(FILE *out, u32 line, u32 width, bool with_number)
         fprintf(out, "%*s | ", (int)width, "");
 }
 
-static void ReportPositioned(const char *prefix, int exitCode, const Source *source, Span span, const char *fmt, va_list args)
+/*
+ * Prints one positioned diagnostic (message, "--> file:line:col", source
+ * line, caret underline) to stderr. Does NOT exit -- shared by the fatal
+ * single-error path (ReportPositioned) and the Diags batch-report path.
+ */
+static void PrintPositioned(const char *prefix, const Source *source, Span span, const char *message)
 {
     u32 line;
     u32 col;
 
     PositionFromOffset(source, span.start, &line, &col);
 
-    /* <prefix>: <formatted message> */
-    fprintf(stderr, "%s%s:%s ", Color(ANSI_RED), prefix, ResetColor());
-    vfprintf(stderr, fmt, args);
-    fputc('\n', stderr);
+    /* <prefix>: <message> */
+    fprintf(stderr, "%s%s:%s %s\n", Color(ANSI_RED), prefix, ResetColor(), message);
 
     /* --> filepath:line:col */
     fprintf(
@@ -149,6 +152,27 @@ static void ReportPositioned(const char *prefix, int exitCode, const Source *sou
     for (u32 i = 0; i < spanLen; i++)
         fputc('^', stderr);
     fprintf(stderr, "%s\n", ResetColor());
+}
+
+static void ReportPositioned(const char *prefix, int exitCode, const Source *source, Span span, const char *fmt, va_list args)
+{
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    int n = vsnprintf(NULL, 0, fmt, argsCopy);
+    va_end(argsCopy);
+
+    if (n < 0)
+        InternalError("failed to format diagnostic message");
+
+    usize len = (usize)n + 1;
+    char *message = malloc(len);
+    if (!message)
+        Error("out of memory");
+
+    vsnprintf(message, len, fmt, args);
+
+    PrintPositioned(prefix, source, span, message);
+
     exit(exitCode);
 }
 
@@ -168,14 +192,6 @@ void InternalError(const char *fmt, ...)
     va_end(args);
 }
 
-void LexError(const Source *source, Span span, const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    ReportPositioned("lexer error", 3, source, span, fmt, args);
-    va_end(args);
-}
-
 void ParseError(const Source *source, Span span, const char *fmt, ...)
 {
     va_list args;
@@ -190,4 +206,69 @@ void CodegenError(const Source *source, Span span, const char *fmt, ...)
     va_start(args, fmt);
     ReportPositioned("codegen error", 5, source, span, fmt, args);
     va_end(args);
+}
+
+#define DIAGS_INITIAL_CAP 8
+
+void DiagsInit(Diags *diags)
+{
+    diags->entries = NULL;
+    diags->len = 0;
+    diags->cap = 0;
+}
+
+void DiagsFree(Diags *diags)
+{
+    for (usize i = 0; i < diags->len; i++)
+        free(diags->entries[i].message);
+
+    free(diags->entries);
+
+    diags->entries = NULL;
+    diags->len = 0;
+    diags->cap = 0;
+}
+
+void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    int n = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+
+    if (n < 0)
+        InternalError("failed to format diagnostic message");
+
+    usize len = (usize)n + 1;
+    char *message = malloc(len);
+    if (!message)
+        Error("out of memory");
+
+    va_start(args, fmt);
+    vsnprintf(message, len, fmt, args);
+    va_end(args);
+
+    if (diags->len == diags->cap)
+    {
+        usize newCap = diags->cap == 0 ? DIAGS_INITIAL_CAP : diags->cap * 2;
+        DiagEntry *newEntries = realloc(diags->entries, newCap * sizeof(*diags->entries));
+        if (!newEntries)
+            Error("out of memory");
+
+        diags->entries = newEntries;
+        diags->cap = newCap;
+    }
+
+    diags->entries[diags->len] = (DiagEntry){
+        .span = span,
+        .message = message,
+    };
+    diags->len++;
+}
+
+void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix)
+{
+    for (usize i = 0; i < diags->len; i++)
+        PrintPositioned(prefix, source, diags->entries[i].span, diags->entries[i].message);
 }

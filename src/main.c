@@ -19,8 +19,22 @@ int main(int argc, char **argv)
     if (!SourceLoad(opts.inputPath, &source))
         Error("failed to load %s", opts.inputPath);
 
+    Diags diags;
+    DiagsInit(&diags);
+
     /* ---- STAGE_TOKENIZE ---- */
-    TokenNode *tokens = Lex(&source);
+    TokenNode *tokens = Lex(&source, &diags);
+
+    if (diags.len > 0)
+    {
+        DiagsReportAll(&diags, &source, "lexer error");
+        DiagsFree(&diags);
+        LexFree(&tokens);
+        SourceFree(&source);
+        CliOptionsFree(&opts);
+        return 3;
+    }
+
     if (opts.wantTokenize)
     {
         printf("Tokens:\n");
@@ -92,6 +106,7 @@ int main(int argc, char **argv)
 
     ParseFree(&stmts);
     LexFree(&tokens);
+    DiagsFree(&diags);
     SourceFree(&source);
     CliOptionsFree(&opts);
 

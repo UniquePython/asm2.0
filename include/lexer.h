@@ -4,6 +4,7 @@
 #include "types.h"
 #include "source.h"
 #include "token.h"
+#include "diagnostic.h"
 
 typedef struct token_node_t
 {
@@ -11,7 +12,7 @@ typedef struct token_node_t
     struct token_node_t *next;
 } TokenNode;
 
-TokenNode *Lex(const Source *source);
+TokenNode *Lex(const Source *source, Diags *diags);
 void LexFree(TokenNode **head);
 
 #endif /* LEXER_H_ */
