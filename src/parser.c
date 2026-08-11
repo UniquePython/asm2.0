@@ -3,6 +3,8 @@
 #include "diagnostic.h"
 #include "mem.h"
 
+#include <stdlib.h>
+
 static Token ParserPeek(const Parser *p)
 {
     if (!p->cursor)

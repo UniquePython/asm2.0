@@ -25,6 +25,12 @@ bool SourceLoad(const char *filepath, Source *out)
         return false;
     }
 
+    if (fileLen > (long)UINT32_MAX)
+    {
+        fclose(file);
+        return false;
+    }
+
     if (fseek(file, 0, SEEK_SET) != 0)
     {
         fclose(file);
