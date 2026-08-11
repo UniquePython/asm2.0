@@ -178,10 +178,16 @@ CodegenResult GenerateCode(const Source *source, const StmtNode *stmts)
         const Stmt *stmt = &node->stmt;
 
         if (stmt->kind == STMT_LABEL)
+        {
+            usize existingOffset;
+            if (LabelTableFind(&table, stmt->as.label.name, &existingOffset))
+                CodegenError(source, stmt->span, "duplicate label '%s'", stmt->as.label.name);
+
             table.entries[table.len++] = (LabelEntry){
                 .name = stmt->as.label.name,
                 .offset = code.len,
             };
+        }
 
         if (stmt->kind == STMT_ENTRY)
             continue;
