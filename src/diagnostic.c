@@ -9,6 +9,8 @@
 #define ANSI_RED "\x1b[31m"
 #define ANSI_BOLD "\x1b[1m"
 #define ANSI_CYAN "\x1b[36m"
+#define ANSI_GREEN "\x1b[32m"
+#define ANSI_YELLOW "\x1b[33m"
 
 static bool DiagnosticUseColor(void)
 {
@@ -92,10 +94,17 @@ static void PrintGutter(FILE *out, u32 line, u32 width, bool with_number)
 
 /*
  * Prints one positioned diagnostic (message, "--> file:line:col", source
- * line, caret underline) to stderr. Does NOT exit -- shared by the fatal
- * single-error path (ReportPositioned) and the Diags batch-report path.
+ * line, caret underline, optional help/syntax lines) to stderr. Does NOT
+ * exit -- shared by the fatal single-error path (ReportPositioned) and
+ * the Diags batch-report path.
+ *
+ * `help` and `syntax` are both optional (pass NULL for either/both) and
+ * are printed flush-left, after the caret block, in that order -- the
+ * specific fix (help) before the general shape (syntax). Neither is
+ * freed here; that's the caller's responsibility (see CodegenErrorFull
+ * and DiagsFree).
  */
-static void PrintPositioned(const char *prefix, const Source *source, Span span, const char *message)
+static void PrintPositioned(const char *prefix, const Source *source, Span span, const char *message, const char *help, const char *syntax)
 {
     u32 line;
     u32 col;
@@ -152,9 +161,15 @@ static void PrintPositioned(const char *prefix, const Source *source, Span span,
     for (u32 i = 0; i < spanLen; i++)
         fputc('^', stderr);
     fprintf(stderr, "%s\n", ResetColor());
+
+    if (help)
+        fprintf(stderr, "%shelp:%s %s\n", Color(ANSI_GREEN), ResetColor(), help);
+
+    if (syntax)
+        fprintf(stderr, "%ssyntax:%s %s\n", Color(ANSI_YELLOW), ResetColor(), syntax);
 }
 
-static void ReportPositioned(const char *prefix, int exitCode, const Source *source, Span span, const char *fmt, va_list args)
+static void ReportPositioned(const char *prefix, int exitCode, const Source *source, Span span, char *help, const char *syntax, const char *fmt, va_list args)
 {
     va_list argsCopy;
     va_copy(argsCopy, args);
@@ -171,7 +186,17 @@ static void ReportPositioned(const char *prefix, int exitCode, const Source *sou
 
     vsnprintf(message, len, fmt, args);
 
-    PrintPositioned(prefix, source, span, message);
+    PrintPositioned(prefix, source, span, message, help, syntax);
+
+    /*
+     * This path is fatal (we're about to exit), so `help` -- which is
+     * owned/heap-allocated per HelpMessage's contract -- has no later
+     * owner to free it. `message` is local to this call and likewise
+     * never escapes, so we free both here. `syntax` is a borrowed
+     * static literal and is never freed.
+     */
+    free(message);
+    free(help);
 
     exit(exitCode);
 }
@@ -196,8 +221,39 @@ void CodegenError(const Source *source, Span span, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    ReportPositioned("codegen error", 5, source, span, fmt, args);
+    ReportPositioned("codegen error", 5, source, span, NULL, NULL, fmt, args);
     va_end(args);
+}
+
+void CodegenErrorFull(const Source *source, Span span, char *help, const char *syntax, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ReportPositioned("codegen error", 5, source, span, help, syntax, fmt, args);
+    va_end(args);
+}
+
+char *HelpMessage(const char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    int n = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+
+    if (n < 0)
+        InternalError("failed to format help message");
+
+    usize len = (usize)n + 1;
+    char *help = malloc(len);
+    if (!help)
+        Error("out of memory");
+
+    va_start(args, fmt);
+    vsnprintf(help, len, fmt, args);
+    va_end(args);
+
+    return help;
 }
 
 #define DIAGS_INITIAL_CAP 8
@@ -214,7 +270,10 @@ void DiagsInit(Diags *diags, usize max)
 void DiagsFree(Diags *diags)
 {
     for (usize i = 0; i < diags->len; i++)
+    {
         free(diags->entries[i].message);
+        free(diags->entries[i].help); /* NULL-safe; syntax is a borrowed literal, not freed */
+    }
 
     free(diags->entries);
 
@@ -223,18 +282,32 @@ void DiagsFree(Diags *diags)
     diags->cap = 0;
 }
 
-void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
+/*
+ * Shared implementation behind DiagsPush and DiagsPushFull. `help` and
+ * `syntax` follow the same ownership rules documented on
+ * DiagsPushFull / CodegenErrorFull: `help` is either NULL or a
+ * heap-allocated string whose ownership transfers into the stored
+ * DiagEntry (freed later by DiagsFree); `syntax` is either NULL or a
+ * borrowed static literal, stored as-is, never freed.
+ *
+ * If the diagnostic is dropped because `diags` is at capacity, `help`
+ * is freed immediately here (its only owner, this call, is discarding
+ * it) so it doesn't leak.
+ */
+static void DiagsPushImpl(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, va_list args)
 {
     diags->nerrs++;
 
     if (diags->max > 0 && diags->len >= diags->max)
-        return; /* at capacity -- don't format or store, just count */
+    {
+        free(help); /* about to be discarded -- nothing else owns it */
+        return;     /* at capacity -- don't format or store, just count */
+    }
 
-    va_list args;
-
-    va_start(args, fmt);
-    int n = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    int n = vsnprintf(NULL, 0, fmt, argsCopy);
+    va_end(argsCopy);
 
     if (n < 0)
         InternalError("failed to format diagnostic message");
@@ -244,9 +317,7 @@ void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
     if (!message)
         Error("out of memory");
 
-    va_start(args, fmt);
     vsnprintf(message, len, fmt, args);
-    va_end(args);
 
     if (diags->len == diags->cap)
     {
@@ -266,14 +337,33 @@ void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
     diags->entries[diags->len] = (DiagEntry){
         .span = span,
         .message = message,
+        .help = help,
+        .syntax = syntax,
     };
     diags->len++;
+}
+
+void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    DiagsPushImpl(diags, span, NULL, NULL, fmt, args);
+    va_end(args);
+}
+
+void DiagsPushFull(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    DiagsPushImpl(diags, span, help, syntax, fmt, args);
+    va_end(args);
 }
 
 void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix)
 {
     for (usize i = 0; i < diags->len; i++)
-        PrintPositioned(prefix, source, diags->entries[i].span, diags->entries[i].message);
+        PrintPositioned(prefix, source, diags->entries[i].span, diags->entries[i].message,
+                        diags->entries[i].help, diags->entries[i].syntax);
 
     if (diags->nerrs > diags->len)
     {
