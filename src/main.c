@@ -11,6 +11,8 @@
 #include "codegen.h"
 #include "elfwriter.h"
 
+#define DIAGS_CAP 20
+
 int main(int argc, char **argv)
 {
     CliOptions opts = ParseCli(argc, argv);
@@ -19,16 +21,16 @@ int main(int argc, char **argv)
     if (!SourceLoad(opts.inputPath, &source))
         Error("failed to load %s", opts.inputPath);
 
-    Diags diags;
-    DiagsInit(&diags, 20);
-
     /* ---- STAGE_TOKENIZE ---- */
-    TokenNode *tokens = Lex(&source, &diags);
+    Diags lexDiags;
+    DiagsInit(&lexDiags, DIAGS_CAP);
 
-    if (diags.len > 0)
+    TokenNode *tokens = Lex(&source, &lexDiags);
+
+    if (lexDiags.len > 0)
     {
-        DiagsReportAll(&diags, &source, "lexer error");
-        DiagsFree(&diags);
+        DiagsReportAll(&lexDiags, &source, "lexer error");
+        DiagsFree(&lexDiags);
         LexFree(&tokens);
         SourceFree(&source);
         CliOptionsFree(&opts);
@@ -57,7 +59,22 @@ int main(int argc, char **argv)
     }
 
     /* ---- STAGE_PARSE ---- */
-    StmtNode *stmts = Parse(&source, tokens);
+    Diags parseDiags;
+    DiagsInit(&parseDiags, DIAGS_CAP);
+
+    StmtNode *stmts = Parse(&source, tokens, &parseDiags);
+
+    if (parseDiags.len > 0)
+    {
+        DiagsReportAll(&parseDiags, &source, "parse error");
+        DiagsFree(&parseDiags);
+        DiagsFree(&lexDiags);
+        LexFree(&tokens);
+        SourceFree(&source);
+        CliOptionsFree(&opts);
+        return 4;
+    }
+
     if (opts.wantParse)
     {
         printf("\nAST:\n");
@@ -73,6 +90,8 @@ int main(int argc, char **argv)
 
     if (opts.furthest == STAGE_PARSE)
     {
+        DiagsFree(&parseDiags);
+        DiagsFree(&lexDiags);
         ParseFree(&stmts);
         LexFree(&tokens);
         SourceFree(&source);
@@ -106,7 +125,8 @@ int main(int argc, char **argv)
 
     ParseFree(&stmts);
     LexFree(&tokens);
-    DiagsFree(&diags);
+    DiagsFree(&parseDiags);
+    DiagsFree(&lexDiags);
     SourceFree(&source);
     CliOptionsFree(&opts);
 

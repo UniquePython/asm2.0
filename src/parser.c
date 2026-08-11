@@ -27,8 +27,13 @@ static Token ParserAdvance(Parser *p)
 static Token ParserExpect(Parser *p, TokenKind kind)
 {
     Token tok = ParserPeek(p);
+
     if (tok.tk != kind)
-        ParseError(p->source, tok.span, "expected %s, found %s", TokenKindAsStr(kind), TokenKindAsStr(tok.tk));
+    {
+        DiagsPush(p->diags, tok.span, "expected %s, found %s", TokenKindAsStr(kind), TokenKindAsStr(tok.tk));
+        return NewEOFToken(tok.span.start);
+    }
+
     return ParserAdvance(p);
 }
 
@@ -37,10 +42,16 @@ static Token ParserExpectKeyword(Parser *p, Keyword kw)
     Token tok = ParserPeek(p);
 
     if (tok.tk != TK_KEYWORD)
-        ParseError(p->source, tok.span, "expected keyword '%s', got %s", KeywordAsStr(kw), TokenKindAsStr(tok.tk));
+    {
+        DiagsPush(p->diags, tok.span, "expected keyword '%s', got %s", KeywordAsStr(kw), TokenKindAsStr(tok.tk));
+        return NewEOFToken(tok.span.start);
+    }
 
     if (tok.as.keyword != kw)
-        ParseError(p->source, tok.span, "expected keyword '%s', got keyword '%s'", KeywordAsStr(kw), KeywordAsStr(tok.as.keyword));
+    {
+        DiagsPush(p->diags, tok.span, "expected keyword '%s', got keyword '%s'", KeywordAsStr(kw), KeywordAsStr(tok.as.keyword));
+        return NewEOFToken(tok.span.start);
+    }
 
     return ParserAdvance(p);
 }
@@ -84,11 +95,9 @@ static Operand ParseOperand(Parser *p)
     case TK_SEMICOLON:
     case TK_EOF:
     default:
-        ParseError(p->source, tok.span, "expected identifier or number, got %s", TokenKindAsStr(tok.tk));
+        DiagsPush(p->diags, tok.span, "expected identifier or number, got %s", TokenKindAsStr(tok.tk));
+        return NewNumberOperand(0, tok.span);
     }
-
-    /* Unreachable: ParseError does not return. */
-    return NewNumberOperand(0, (Span){0});
 }
 
 /*
@@ -160,20 +169,43 @@ static Stmt ParseStmt(Parser *p)
         return ParseEntryStmt(p);
 
     Token tok = ParserPeek(p);
-    ParseError(p->source, tok.span, "expected statement, got %s", TokenKindAsStr(tok.tk));
+    DiagsPush(p->diags, tok.span, "expected statement, got %s", TokenKindAsStr(tok.tk));
 
-    /* Unreachable: ParseError does not return. */
-    return ParseLabelDecl(p);
+    return NewSyscallStmt(tok.span); /* dummy -- discarded by caller, see Parse() */
+}
+
+static void ParserSynchronize(Parser *p)
+{
+    for (;;)
+    {
+        Token tok = ParserPeek(p);
+
+        if (tok.tk == TK_EOF)
+            return;
+
+        if (tok.tk == TK_KEYWORD &&
+            (tok.as.keyword == KW_LABEL ||
+             tok.as.keyword == KW_MOVE ||
+             tok.as.keyword == KW_SYSCALL ||
+             tok.as.keyword == KW_ENTRY))
+            return;
+
+        ParserAdvance(p);
+
+        if (tok.tk == TK_SEMICOLON)
+            return; /* just consumed a ';' -- next token is a fresh start */
+    }
 }
 
 /*
  * program ::= statement*
  */
-StmtNode *Parse(const Source *source, TokenNode *tokens)
+StmtNode *Parse(const Source *source, TokenNode *tokens, Diags *diags)
 {
     Parser p = {
         .cursor = tokens,
         .source = source,
+        .diags = diags,
     };
 
     StmtNode *head = NULL;
@@ -181,7 +213,15 @@ StmtNode *Parse(const Source *source, TokenNode *tokens)
 
     while (ParserPeek(&p).tk != TK_EOF)
     {
+        usize errsBefore = diags->nerrs;
+
         Stmt stmt = ParseStmt(&p);
+
+        if (diags->nerrs != errsBefore)
+        {
+            ParserSynchronize(&p);
+            continue; /* discard `stmt` -- it may hold dummy/placeholder data */
+        }
 
         StmtNode *node = Alloc(sizeof(*node));
 

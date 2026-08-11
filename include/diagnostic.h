@@ -7,7 +7,6 @@
 
 void Error(const char *fmt, ...);
 void InternalError(const char *fmt, ...);
-void ParseError(const Source *source, Span span, const char *fmt, ...);
 void CodegenError(const Source *source, Span span, const char *fmt, ...);
 
 typedef struct diag_entry_t

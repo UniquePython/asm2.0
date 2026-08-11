@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "source.h"
+#include "diagnostic.h"
 #include "lexer.h"
 #include "keyword.h"
 #include "tokenkind.h"
@@ -19,9 +20,10 @@ typedef struct parser_t
 {
     const TokenNode *cursor;
     const Source *source;
+    Diags *diags;
 } Parser;
 
-StmtNode *Parse(const Source *source, TokenNode *tokens);
+StmtNode *Parse(const Source *source, TokenNode *tokens, Diags *diags);
 void ParseFree(StmtNode **head);
 
 #endif /* PARSER_H_ */

@@ -192,14 +192,6 @@ void InternalError(const char *fmt, ...)
     va_end(args);
 }
 
-void ParseError(const Source *source, Span span, const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    ReportPositioned("parser error", 4, source, span, fmt, args);
-    va_end(args);
-}
-
 void CodegenError(const Source *source, Span span, const char *fmt, ...)
 {
     va_list args;
