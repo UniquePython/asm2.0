@@ -1,0 +1,5 @@
+entry start;
+
+label start:
+    move 5000000000 to eax;
+    syscall;

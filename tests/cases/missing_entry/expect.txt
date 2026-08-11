@@ -1,0 +1,3 @@
+stage: compile
+exit: 5
+stderr_contains: no entry statement

@@ -1,0 +1,4 @@
+stage: parse
+exit: 3
+stderr_contains: unexpected character '$'
+stderr_contains: unexpected character '@'

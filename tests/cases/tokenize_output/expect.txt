@@ -1,0 +1,8 @@
+stage: tokenize
+exit: 0
+stdout_contains: Tokens:
+stdout_contains: Token keyword(entry) @0:5
+stdout_contains: Token keyword(move) @31:35
+stdout_contains: Token number(231) @36:39
+stdout_contains: Token keyword(syscall) @52:59
+stdout_contains: Token end of file @61:61

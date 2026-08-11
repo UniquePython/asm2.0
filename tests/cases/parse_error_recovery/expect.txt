@@ -1,0 +1,4 @@
+stage: parse
+exit: 4
+stderr_contains: expected statement, got identifier
+stderr_contains: expected keyword 'to', got identifier

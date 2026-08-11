@@ -1,0 +1,3 @@
+stage: parse
+exit: 3
+stderr_contains: integer literal is too large

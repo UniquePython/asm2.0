@@ -1,0 +1,8 @@
+entry start;
+
+label start:
+    move 231 to eax;
+    syscall;
+
+label start:
+    syscall;

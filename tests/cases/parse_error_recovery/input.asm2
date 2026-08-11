@@ -1,0 +1,7 @@
+entry start;
+
+label start:
+    syscal;
+    move 10 to eax;
+    move 20 zz ebx;
+    syscall;

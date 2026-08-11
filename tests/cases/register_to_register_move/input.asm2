@@ -1,0 +1,5 @@
+entry start;
+
+label start:
+    move eax to ebx;
+    syscall;

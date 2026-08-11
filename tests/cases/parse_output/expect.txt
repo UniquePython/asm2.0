@@ -1,0 +1,7 @@
+stage: parse
+exit: 0
+stdout_contains: AST:
+stdout_contains: Stmt entry("start") @0:12
+stdout_contains: Stmt label("start") @14:26
+stdout_contains: Stmt move(Operand number(231) @36:39, Operand identifier("eax") @43:46) @31:47
+stdout_contains: Stmt syscall @52:60

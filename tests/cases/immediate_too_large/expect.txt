@@ -1,0 +1,3 @@
+stage: compile
+exit: 5
+stderr_contains: immediate value is too large to fit in 32 bits
