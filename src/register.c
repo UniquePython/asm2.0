@@ -1,6 +1,7 @@
 #include "register.h"
 
 #include <string.h>
+#include <assert.h>
 
 static const char *registers[] = {
     "eax",
@@ -12,6 +13,8 @@ static const char *registers[] = {
     "esi",
     "edi",
 };
+
+static_assert(sizeof(registers) / sizeof(registers[0]) == NREGS, "registers[] must have exactly NREGS entries, in enum order");
 
 bool StrToRegister(const char *str, usize len, Register *out)
 {

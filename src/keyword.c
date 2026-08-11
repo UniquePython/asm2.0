@@ -1,6 +1,7 @@
 #include "keyword.h"
 
 #include <string.h>
+#include <assert.h>
 
 static const char *keywords[] = {
     "label",
@@ -9,6 +10,8 @@ static const char *keywords[] = {
     "syscall",
     "entry",
 };
+
+static_assert(sizeof(keywords) / sizeof(keywords[0]) == NKWS, "keywords[] must have exactly NKWS entries, in enum order");
 
 bool StrToKeyword(const char *str, usize len, Keyword *out)
 {
