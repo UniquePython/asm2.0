@@ -3,8 +3,6 @@
 #include "diagnostic.h"
 #include "mem.h"
 
-#include <stdlib.h>
-
 static Token ParserPeek(const Parser *p)
 {
     if (!p->cursor)
@@ -212,7 +210,7 @@ void ParseFree(StmtNode **head)
     while (node)
     {
         StmtNode *next = node->next;
-        free(node);
+        Free(node);
         node = next;
     }
 

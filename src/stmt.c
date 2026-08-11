@@ -1,7 +1,6 @@
 #include "stmt.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "mem.h"
 
@@ -73,8 +72,8 @@ static int StmtFormat(const Stmt *stmt, char *buffer, usize len)
         int n = snprintf(buffer, len, "Stmt move(%s, %s)" SPAN_FMT,
                          srcStr, destStr, SPAN_ARG(stmt->span));
 
-        free(srcStr);
-        free(destStr);
+        Free(srcStr);
+        Free(destStr);
 
         return n;
     }

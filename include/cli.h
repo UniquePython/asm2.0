@@ -15,7 +15,7 @@ typedef struct cli_options_t
     const char *inputPath; /* borrowed from argv -- argv outlives this struct */
     char *outputPath;      /* ALWAYS owned, regardless of whether it came from
                             * --output or was derived from inputPath. Uniform
-                            * ownership: always free it, no exceptions, no
+                            * ownership: always Free it, no exceptions, no
                             * branch-dependent rule. */
 
     bool wantTokenize;

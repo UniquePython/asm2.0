@@ -18,3 +18,8 @@ void *Realloc(void *ptr, usize size)
         Error("out of memory");
     return newPtr;
 }
+
+void Free(void *ptr)
+{
+    free(ptr);
+}

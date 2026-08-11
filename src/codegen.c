@@ -1,7 +1,6 @@
 #include "codegen.h"
 
 #include <string.h>
-#include <stdlib.h>
 
 #include "diagnostic.h"
 #include "mem.h"
@@ -130,7 +129,7 @@ static void LabelTableFree(LabelTable *table)
     if (!table)
         return;
 
-    free(table->entries);
+    Free(table->entries);
 
     table->entries = NULL;
     table->len = 0;
@@ -197,7 +196,7 @@ CodegenResult GenerateCode(const Source *source, const StmtNode *stmts)
         for (usize i = 0; i < encoded.len; i++)
             ByteBufWriteU8(&code, encoded.bytes[i]);
 
-        free(encoded.bytes);
+        Free(encoded.bytes);
     }
 
     /* Second pass: resolve the entry label. */

@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <getopt.h>
-#include <stdlib.h>
 
 #include "diagnostic.h"
 #include "mem.h"
@@ -166,6 +165,6 @@ CliOptions ParseCli(int argc, char **argv)
 
 void CliOptionsFree(CliOptions *opts)
 {
-    free(opts->outputPath);
+    Free(opts->outputPath);
     opts->outputPath = NULL;
 }

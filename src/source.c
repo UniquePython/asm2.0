@@ -3,7 +3,6 @@
 #include "mem.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 bool SourceLoad(const char *filepath, Source *out)
@@ -43,7 +42,7 @@ bool SourceLoad(const char *filepath, Source *out)
 
     if (fread(data, 1, len, file) != len)
     {
-        free(data);
+        Free(data);
         fclose(file);
         return false;
     }
@@ -69,8 +68,8 @@ bool SourceLoad(const char *filepath, Source *out)
 
 void SourceFree(Source *source)
 {
-    free(source->filepath);
-    free(source->data);
+    Free(source->filepath);
+    Free(source->data);
 
     *source = (Source){0};
 }

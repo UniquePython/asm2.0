@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include "mem.h"
 #include "diagnostic.h"
@@ -31,7 +30,7 @@ int main(int argc, char **argv)
             char *buf = Alloc(len);
             TokenAsStr(&tnode->token, buf);
             printf("%s\n", buf);
-            free(buf);
+            Free(buf);
         }
     }
 
@@ -54,7 +53,7 @@ int main(int argc, char **argv)
             char *buf = Alloc(len);
             StmtAsStr(&snode->stmt, buf);
             printf(" %s\n", buf);
-            free(buf);
+            Free(buf);
         }
     }
 

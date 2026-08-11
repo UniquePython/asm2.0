@@ -5,5 +5,6 @@
 
 void *Alloc(usize size);
 void *Realloc(void *ptr, usize size);
+void Free(void *ptr);
 
 #endif /* MEM_H_ */

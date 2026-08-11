@@ -1,7 +1,5 @@
 #include "bytebuf.h"
 
-#include <stdlib.h>
-
 #include "mem.h"
 
 #define BYTEBUF_INITIAL_CAP 32
@@ -15,7 +13,7 @@ void ByteBufInit(ByteBuf *buf)
 
 void ByteBufFree(ByteBuf *buf)
 {
-    free(buf->data);
+    Free(buf->data);
     buf->data = NULL;
     buf->len = 0;
     buf->cap = 0;

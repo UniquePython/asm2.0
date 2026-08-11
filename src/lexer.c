@@ -1,6 +1,5 @@
 #include "lexer.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "mem.h"
@@ -183,9 +182,9 @@ void LexFree(TokenNode **head)
         TokenNode *next = node->next;
 
         if (node->token.tk == TK_IDENTIFIER)
-            free(node->token.as.identifier);
+            Free(node->token.as.identifier);
 
-        free(node);
+        Free(node);
         node = next;
     }
 
