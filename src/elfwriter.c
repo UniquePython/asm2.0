@@ -52,30 +52,30 @@ ByteBuf BuildElf(const CodegenResult *result)
 
     /* --- rest of Ehdr --- */
 
-    ByteBufWriteU16(&out, ET_EXEC);
-    ByteBufWriteU16(&out, EM_X86_64);
-    ByteBufWriteU32(&out, EV_CURRENT);
-    ByteBufWriteU64(&out, entry);
-    ByteBufWriteU64(&out, EHDR_SIZE);
-    ByteBufWriteU64(&out, 0); /* e_shoff */
-    ByteBufWriteU32(&out, 0); /* e_flags */
-    ByteBufWriteU16(&out, EHDR_SIZE);
-    ByteBufWriteU16(&out, PHDR_SIZE);
-    ByteBufWriteU16(&out, 1); /* e_phnum */
-    ByteBufWriteU16(&out, 0); /* e_shentsize */
-    ByteBufWriteU16(&out, 0); /* e_shnum */
-    ByteBufWriteU16(&out, 0); /* e_shstrndx */
+    ByteBufWriteU16LE(&out, ET_EXEC);
+    ByteBufWriteU16LE(&out, EM_X86_64);
+    ByteBufWriteU32LE(&out, EV_CURRENT);
+    ByteBufWriteU64LE(&out, entry);
+    ByteBufWriteU64LE(&out, EHDR_SIZE);
+    ByteBufWriteU64LE(&out, 0); /* e_shoff */
+    ByteBufWriteU32LE(&out, 0); /* e_flags */
+    ByteBufWriteU16LE(&out, EHDR_SIZE);
+    ByteBufWriteU16LE(&out, PHDR_SIZE);
+    ByteBufWriteU16LE(&out, 1); /* e_phnum */
+    ByteBufWriteU16LE(&out, 0); /* e_shentsize */
+    ByteBufWriteU16LE(&out, 0); /* e_shnum */
+    ByteBufWriteU16LE(&out, 0); /* e_shstrndx */
 
     /* ================= Elf64_Phdr ================= */
 
-    ByteBufWriteU32(&out, PT_LOAD);
-    ByteBufWriteU32(&out, PF_X | PF_R);
-    ByteBufWriteU64(&out, 0);         /* p_offset */
-    ByteBufWriteU64(&out, BASE_ADDR); /* p_vaddr */
-    ByteBufWriteU64(&out, BASE_ADDR); /* p_paddr */
-    ByteBufWriteU64(&out, totalSize); /* p_filesz */
-    ByteBufWriteU64(&out, totalSize); /* p_memsz */
-    ByteBufWriteU64(&out, 0x1000);    /* p_align */
+    ByteBufWriteU32LE(&out, PT_LOAD);
+    ByteBufWriteU32LE(&out, PF_X | PF_R);
+    ByteBufWriteU64LE(&out, 0);         /* p_offset */
+    ByteBufWriteU64LE(&out, BASE_ADDR); /* p_vaddr */
+    ByteBufWriteU64LE(&out, BASE_ADDR); /* p_paddr */
+    ByteBufWriteU64LE(&out, totalSize); /* p_filesz */
+    ByteBufWriteU64LE(&out, totalSize); /* p_memsz */
+    ByteBufWriteU64LE(&out, 0x1000);    /* p_align */
 
     /* ================= code ================= */
 

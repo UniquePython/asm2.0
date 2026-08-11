@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "mem.h"
 #include "diagnostic.h"
 #include "lexer.h"
@@ -7,40 +8,91 @@
 #include "token.h"
 #include "stmt.h"
 #include "parser.h"
+#include "cli.h"
+#include "codegen.h"
+#include "elfwriter.h"
 
 int main(int argc, char **argv)
 {
-    if (argc < 2)
-        Error("usage: %s <file>", argv[0]);
+    CliOptions opts = ParseCli(argc, argv);
 
     Source source;
-    if (!SourceLoad(argv[1], &source))
-        Error("failed to load %s", argv[1]);
+    if (!SourceLoad(opts.inputPath, &source))
+        Error("failed to load %s", opts.inputPath);
 
+    /* ---- STAGE_TOKENIZE ---- */
     TokenNode *tokens = Lex(&source);
-    printf("Tokens:\n");
-    for (TokenNode *tnode = tokens; tnode; tnode = tnode->next)
+    if (opts.wantTokenize)
     {
-        usize len = TokenAsStrLen(&tnode->token);
-        char *buf = Alloc(len);
-        TokenAsStr(&tnode->token, buf);
-        printf("%s\n", buf);
-        free(buf);
+        printf("Tokens:\n");
+        for (TokenNode *tnode = tokens; tnode; tnode = tnode->next)
+        {
+            usize len = TokenAsStrLen(&tnode->token);
+            char *buf = Alloc(len);
+            TokenAsStr(&tnode->token, buf);
+            printf("%s\n", buf);
+            free(buf);
+        }
     }
 
-    printf("\nAST:\n");
-    StmtNode *stmts = Parse(&source, tokens);
-    for (StmtNode *snode = stmts; snode; snode = snode->next)
+    if (opts.furthest == STAGE_TOKENIZE)
     {
-        usize len = StmtAsStrLen(&snode->stmt);
-        char *buf = Alloc(len);
-        StmtAsStr(&snode->stmt, buf);
-        printf(" %s\n", buf);
-        free(buf);
+        LexFree(&tokens);
+        SourceFree(&source);
+        CliOptionsFree(&opts);
+        return 0;
     }
+
+    /* ---- STAGE_PARSE ---- */
+    StmtNode *stmts = Parse(&source, tokens);
+    if (opts.wantParse)
+    {
+        printf("\nAST:\n");
+        for (StmtNode *snode = stmts; snode; snode = snode->next)
+        {
+            usize len = StmtAsStrLen(&snode->stmt);
+            char *buf = Alloc(len);
+            StmtAsStr(&snode->stmt, buf);
+            printf(" %s\n", buf);
+            free(buf);
+        }
+    }
+
+    if (opts.furthest == STAGE_PARSE)
+    {
+        LexFree(&tokens);
+        SourceFree(&source);
+        CliOptionsFree(&opts);
+        return 0;
+    }
+
+    /* ---- STAGE_COMPILE ---- */
+
+    CodegenResult result = GenerateCode(&source, stmts);
+    ByteBuf elf = BuildElf(&result);
+
+    FILE *file = fopen(opts.outputPath, "wb");
+    if (!file)
+        Error("failed to open output file '%s'", opts.outputPath);
+
+    if (fwrite(elf.data, 1, elf.len, file) != elf.len)
+    {
+        fclose(file);
+        Error("failed to write output file '%s'", opts.outputPath);
+    }
+
+    if (fclose(file) != 0)
+        Error("failed to close output file '%s'", opts.outputPath);
+
+    if (chmod(opts.outputPath, 0755) != 0)
+        Error("failed to make '%s' executable", opts.outputPath);
+
+    ByteBufFree(&elf);
+    ByteBufFree(&result.code);
 
     LexFree(&tokens);
     SourceFree(&source);
+    CliOptionsFree(&opts);
 
     return 0;
 }

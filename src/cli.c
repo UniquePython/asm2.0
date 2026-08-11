@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <getopt.h>
+#include <stdlib.h>
 
 #include "diagnostic.h"
 #include "mem.h"
@@ -123,6 +124,7 @@ CliOptions ParseCli(int argc, char **argv)
             if (optopt)
                 Error("unknown option '-%c'", optopt);
             Error("unknown option");
+            break; /* Unreachable */
 
         default:
             InternalError("unhandled getopt_long return value %d", c);
