@@ -200,3 +200,19 @@ StmtNode *Parse(const Source *source, TokenNode *tokens)
 
     return head;
 }
+
+void ParseFree(StmtNode **head)
+{
+    if (!head)
+        return;
+
+    StmtNode *node = *head;
+    while (node)
+    {
+        StmtNode *next = node->next;
+        free(node);
+        node = next;
+    }
+
+    *head = NULL;
+}

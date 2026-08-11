@@ -60,6 +60,7 @@ int main(int argc, char **argv)
 
     if (opts.furthest == STAGE_PARSE)
     {
+        ParseFree(&stmts);
         LexFree(&tokens);
         SourceFree(&source);
         CliOptionsFree(&opts);
@@ -90,6 +91,7 @@ int main(int argc, char **argv)
     ByteBufFree(&elf);
     ByteBufFree(&result.code);
 
+    ParseFree(&stmts);
     LexFree(&tokens);
     SourceFree(&source);
     CliOptionsFree(&opts);

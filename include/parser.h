@@ -22,5 +22,6 @@ typedef struct parser_t
 } Parser;
 
 StmtNode *Parse(const Source *source, TokenNode *tokens);
+void ParseFree(StmtNode **head);
 
 #endif /* PARSER_H_ */
