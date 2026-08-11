@@ -12,7 +12,9 @@ void CodegenError(const Source *source, Span span, const char *fmt, ...);
 typedef struct diag_entry_t
 {
     Span span;
-    char *message; /* owned, heap-allocated, already formatted */
+    char *message;      /* owned, heap-allocated, already formatted */
+    char *help;         /* owned */
+    const char *syntax; /* borrowed literal from syntax.h */
 } DiagEntry;
 
 typedef struct diags_t
