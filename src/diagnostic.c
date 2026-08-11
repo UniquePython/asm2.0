@@ -210,11 +210,13 @@ void CodegenError(const Source *source, Span span, const char *fmt, ...)
 
 #define DIAGS_INITIAL_CAP 8
 
-void DiagsInit(Diags *diags)
+void DiagsInit(Diags *diags, usize max)
 {
     diags->entries = NULL;
     diags->len = 0;
     diags->cap = 0;
+    diags->max = max;
+    diags->nerrs = 0;
 }
 
 void DiagsFree(Diags *diags)
@@ -231,6 +233,11 @@ void DiagsFree(Diags *diags)
 
 void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
 {
+    diags->nerrs++;
+
+    if (diags->max > 0 && diags->len >= diags->max)
+        return; /* at capacity -- don't format or store, just count */
+
     va_list args;
 
     va_start(args, fmt);
@@ -252,6 +259,10 @@ void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
     if (diags->len == diags->cap)
     {
         usize newCap = diags->cap == 0 ? DIAGS_INITIAL_CAP : diags->cap * 2;
+
+        if (diags->max > 0 && newCap > diags->max)
+            newCap = diags->max;
+
         DiagEntry *newEntries = realloc(diags->entries, newCap * sizeof(*diags->entries));
         if (!newEntries)
             Error("out of memory");
@@ -271,4 +282,12 @@ void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix
 {
     for (usize i = 0; i < diags->len; i++)
         PrintPositioned(prefix, source, diags->entries[i].span, diags->entries[i].message);
+
+    if (diags->nerrs > diags->len)
+    {
+        usize suppressed = diags->nerrs - diags->len;
+        fprintf(stderr, "%s%s:%s " U64_FMT " further error%s suppressed\n",
+                Color(ANSI_RED), prefix, ResetColor(),
+                (u64)suppressed, suppressed == 1 ? "" : "s");
+    }
 }

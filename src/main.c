@@ -20,7 +20,7 @@ int main(int argc, char **argv)
         Error("failed to load %s", opts.inputPath);
 
     Diags diags;
-    DiagsInit(&diags);
+    DiagsInit(&diags, 20);
 
     /* ---- STAGE_TOKENIZE ---- */
     TokenNode *tokens = Lex(&source, &diags);

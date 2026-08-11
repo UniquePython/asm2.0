@@ -19,11 +19,13 @@ typedef struct diag_entry_t
 typedef struct diags_t
 {
     DiagEntry *entries;
-    usize len;
-    usize cap;
+    usize len;   /* number of diagnostics actually stored (<= max) */
+    usize cap;   /* allocated capacity of entries[] (<= max) */
+    usize max;   /* storage cap; 0 means unlimited */
+    usize nerrs; /* total DiagsPush calls, including suppressed ones */
 } Diags;
 
-void DiagsInit(Diags *diags);
+void DiagsInit(Diags *diags, usize max);
 void DiagsFree(Diags *diags);
 void DiagsPush(Diags *diags, Span span, const char *fmt, ...);
 void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix);
