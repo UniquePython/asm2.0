@@ -18,4 +18,6 @@ void ByteBufWriteU16LE(ByteBuf *buf, u16 value);
 void ByteBufWriteU32LE(ByteBuf *buf, u32 value);
 void ByteBufWriteU64LE(ByteBuf *buf, u64 value);
 
+void ByteBufWriteBytes(ByteBuf *buf, const u8 *data, usize len);
+
 #endif /* BYTEBUF_H_ */

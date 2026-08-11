@@ -59,3 +59,9 @@ void ByteBufWriteU64LE(ByteBuf *buf, u64 value)
     ByteBufWriteU8(buf, (u8)((value >> 48) & 0xFF));
     ByteBufWriteU8(buf, (u8)((value >> 56) & 0xFF));
 }
+
+void ByteBufWriteBytes(ByteBuf *buf, const u8 *data, usize len)
+{
+    for (usize i = 0; i < len; i++)
+        ByteBufWriteU8(buf, data[i]);
+}
