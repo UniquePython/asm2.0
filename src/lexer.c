@@ -102,7 +102,9 @@ static Token LexNumber(const Source *source, u32 *pos, Diags *diags)
     };
 
     if (overflowed)
-        DiagsPush(diags, span, "integer literal is too large");
+        DiagsPushFull(diags, span,
+                      HelpMessage("numbers must fit in a 64-bit unsigned integer (max %llu)", (unsigned long long)UINT64_MAX),
+                      NULL, "integer literal is too large");
 
     return NewNumberToken(value, span);
 }

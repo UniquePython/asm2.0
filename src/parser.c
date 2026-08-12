@@ -2,6 +2,10 @@
 
 #include "diagnostic.h"
 #include "mem.h"
+#include "suggest.h"
+#include "syntax.h"
+
+#include <string.h>
 
 static Token ParserPeek(const Parser *p)
 {
@@ -24,32 +28,35 @@ static Token ParserAdvance(Parser *p)
     return tok;
 }
 
-static Token ParserExpect(Parser *p, TokenKind kind)
+static Token ParserExpect(Parser *p, TokenKind kind, const char *syntax)
 {
     Token tok = ParserPeek(p);
 
     if (tok.tk != kind)
     {
-        DiagsPush(p->diags, tok.span, "expected %s, found %s", TokenKindAsStr(kind), TokenKindAsStr(tok.tk));
+        DiagsPushFull(p->diags, tok.span, NULL, syntax,
+                      "expected %s, found %s", TokenKindAsStr(kind), TokenKindAsStr(tok.tk));
         return NewEOFToken(tok.span.start);
     }
 
     return ParserAdvance(p);
 }
 
-static Token ParserExpectKeyword(Parser *p, Keyword kw)
+static Token ParserExpectKeyword(Parser *p, Keyword kw, const char *syntax)
 {
     Token tok = ParserPeek(p);
 
     if (tok.tk != TK_KEYWORD)
     {
-        DiagsPush(p->diags, tok.span, "expected keyword '%s', got %s", KeywordAsStr(kw), TokenKindAsStr(tok.tk));
+        DiagsPushFull(p->diags, tok.span, NULL, syntax,
+                      "expected keyword '%s', got %s", KeywordAsStr(kw), TokenKindAsStr(tok.tk));
         return NewEOFToken(tok.span.start);
     }
 
     if (tok.as.keyword != kw)
     {
-        DiagsPush(p->diags, tok.span, "expected keyword '%s', got keyword '%s'", KeywordAsStr(kw), KeywordAsStr(tok.as.keyword));
+        DiagsPushFull(p->diags, tok.span, NULL, syntax,
+                      "expected keyword '%s', got keyword '%s'", KeywordAsStr(kw), KeywordAsStr(tok.as.keyword));
         return NewEOFToken(tok.span.start);
     }
 
@@ -61,9 +68,9 @@ static Token ParserExpectKeyword(Parser *p, Keyword kw)
  */
 static Stmt ParseLabelDecl(Parser *p)
 {
-    Token labelTok = ParserExpectKeyword(p, KW_LABEL);
-    Token nameTok = ParserExpect(p, TK_IDENTIFIER);
-    Token colonTok = ParserExpect(p, TK_COLON);
+    Token labelTok = ParserExpectKeyword(p, KW_LABEL, LABEL_SYNTAX);
+    Token nameTok = ParserExpect(p, TK_IDENTIFIER, LABEL_SYNTAX);
+    Token colonTok = ParserExpect(p, TK_COLON, LABEL_SYNTAX);
 
     Span span = {
         .start = labelTok.span.start,
@@ -76,7 +83,7 @@ static Stmt ParseLabelDecl(Parser *p)
 /*
  * operand ::= IDENTIFIER | NUMBER
  */
-static Operand ParseOperand(Parser *p)
+static Operand ParseOperand(Parser *p, const char *syntax)
 {
     Token tok = ParserPeek(p);
 
@@ -95,7 +102,8 @@ static Operand ParseOperand(Parser *p)
     case TK_SEMICOLON:
     case TK_EOF:
     default:
-        DiagsPush(p->diags, tok.span, "expected identifier or number, got %s", TokenKindAsStr(tok.tk));
+        DiagsPushFull(p->diags, tok.span, NULL, syntax,
+                      "expected identifier or number, got %s", TokenKindAsStr(tok.tk));
         return NewNumberOperand(0, tok.span);
     }
 }
@@ -105,13 +113,13 @@ static Operand ParseOperand(Parser *p)
  */
 static Stmt ParseMoveStmt(Parser *p)
 {
-    Token moveTok = ParserExpectKeyword(p, KW_MOVE);
-    Operand src = ParseOperand(p);
+    Token moveTok = ParserExpectKeyword(p, KW_MOVE, MOVE_SYNTAX);
+    Operand src = ParseOperand(p, MOVE_SYNTAX);
 
-    ParserExpectKeyword(p, KW_TO);
+    ParserExpectKeyword(p, KW_TO, MOVE_SYNTAX);
 
-    Operand dest = ParseOperand(p);
-    Token semicolonTok = ParserExpect(p, TK_SEMICOLON);
+    Operand dest = ParseOperand(p, MOVE_SYNTAX);
+    Token semicolonTok = ParserExpect(p, TK_SEMICOLON, MOVE_SYNTAX);
 
     Span span = {
         .start = moveTok.span.start,
@@ -126,8 +134,8 @@ static Stmt ParseMoveStmt(Parser *p)
  */
 static Stmt ParseSyscallStmt(Parser *p)
 {
-    Token syscallTok = ParserExpectKeyword(p, KW_SYSCALL);
-    Token semicolonTok = ParserExpect(p, TK_SEMICOLON);
+    Token syscallTok = ParserExpectKeyword(p, KW_SYSCALL, SYSCALL_SYNTAX);
+    Token semicolonTok = ParserExpect(p, TK_SEMICOLON, SYSCALL_SYNTAX);
 
     Span span = {
         .start = syscallTok.span.start,
@@ -142,9 +150,9 @@ static Stmt ParseSyscallStmt(Parser *p)
  */
 static Stmt ParseEntryStmt(Parser *p)
 {
-    Token entryTok = ParserExpectKeyword(p, KW_ENTRY);
-    Token labelTok = ParserExpect(p, TK_IDENTIFIER);
-    Token semicolonTok = ParserExpect(p, TK_SEMICOLON);
+    Token entryTok = ParserExpectKeyword(p, KW_ENTRY, ENTRY_SYNTAX);
+    Token labelTok = ParserExpect(p, TK_IDENTIFIER, ENTRY_SYNTAX);
+    Token semicolonTok = ParserExpect(p, TK_SEMICOLON, ENTRY_SYNTAX);
 
     Span span = {
         .start = entryTok.span.start,
@@ -169,7 +177,17 @@ static Stmt ParseStmt(Parser *p)
         return ParseEntryStmt(p);
 
     Token tok = ParserPeek(p);
-    DiagsPush(p->diags, tok.span, "expected statement, got %s", TokenKindAsStr(tok.tk));
+    char *help = NULL;
+    if (tok.tk == TK_IDENTIFIER)
+    {
+        usize len = strlen(tok.as.identifier);
+        usize maxDist = len / 3 < 1 ? 1 : len / 3;
+        const char *suggestion = SuggestClosest(tok.as.identifier, stmtStartingKeywords, 4, maxDist);
+        if (suggestion)
+            help = HelpMessage("did you mean '%s'?", suggestion);
+    }
+
+    DiagsPushFull(p->diags, tok.span, help, NULL, "expected statement, got %s", TokenKindAsStr(tok.tk));
 
     return NewSyscallStmt(tok.span); /* dummy -- discarded by caller, see Parse() */
 }

@@ -16,6 +16,8 @@ typedef enum register_t
     NREGS,
 } Register;
 
+extern const char *const registers[NREGS];
+
 bool StrToRegister(const char *str, usize len, Register *out);
 
 const char *RegisterAsStr(Register reg);

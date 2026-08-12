@@ -13,6 +13,15 @@ static const char *keywords[] = {
 
 static_assert(sizeof(keywords) / sizeof(keywords[0]) == NKWS, "keywords[] must have exactly NKWS entries, in enum order");
 
+const char *const stmtStartingKeywords[] = {
+    "label",
+    "move",
+    "syscall",
+    "entry",
+};
+
+static_assert(sizeof(stmtStartingKeywords) / sizeof(stmtStartingKeywords[0]) == NKWS - 1, "stmtStartingKeywords[] must have exactly NKWS - 1 entries");
+
 bool StrToKeyword(const char *str, usize len, Keyword *out)
 {
     for (usize idx = 0; idx < NKWS; idx++)

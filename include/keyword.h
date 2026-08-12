@@ -13,6 +13,8 @@ typedef enum keyword_t
     NKWS,
 } Keyword;
 
+extern const char *const stmtStartingKeywords[NKWS - 1];
+
 bool StrToKeyword(const char *str, usize len, Keyword *out);
 
 const char *KeywordAsStr(Keyword kw);

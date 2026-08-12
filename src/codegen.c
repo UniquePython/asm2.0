@@ -4,15 +4,26 @@
 
 #include "diagnostic.h"
 #include "mem.h"
+#include "syntax.h"
+#include "suggest.h"
 
 Register ResolveRegisterOperand(const Source *source, const Operand *operand)
 {
     if (operand->kind != OPERAND_IDENTIFIER)
-        CodegenError(source, operand->span, "expected a register, got a number");
+        CodegenErrorFull(source, operand->span, NULL, MOVE_SYNTAX, "expected a register, got a number");
 
     Register reg;
     if (!StrToRegister(operand->as.identifier, strlen(operand->as.identifier), &reg))
-        CodegenError(source, operand->span, "unknown register '%s'", operand->as.identifier);
+    {
+        usize len = strlen(operand->as.identifier);
+        usize maxDist = len / 3 < 1 ? 1 : len / 3;
+        const char *suggestion = SuggestClosest(operand->as.identifier, registers, 8, maxDist);
+
+        CodegenErrorFull(source, operand->span,
+                         suggestion ? HelpMessage("did you mean '%s'?", suggestion) : NULL,
+                         MOVE_SYNTAX,
+                         "unknown register '%s'", operand->as.identifier);
+    }
 
     return reg;
 }
@@ -65,12 +76,15 @@ static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
     const Operand *dest = &stmt->as.move.dest;
 
     if (src->kind != OPERAND_NUMBER)
-        CodegenError(source, src->span, "only numeric sources are supported for 'move' right now");
+        CodegenErrorFull(source, src->span, NULL, MOVE_SYNTAX,
+                         "only numeric sources are supported for 'move' right now");
 
     Register destReg = ResolveRegisterOperand(source, dest);
 
     if (src->as.number > UINT32_MAX)
-        CodegenError(source, src->span, "immediate value is too large to fit in 32 bits");
+        CodegenErrorFull(source, src->span,
+                         HelpMessage("the largest value 'move' currently supports is %u", UINT32_MAX),
+                         MOVE_SYNTAX, "immediate value is too large to fit in 32 bits");
 
     u8 *bytes = Alloc(5);
     bytes[0] = (u8)(0xB8 + (u8)destReg);
@@ -180,7 +194,10 @@ CodegenResult GenerateCode(const Source *source, const StmtNode *stmts)
         {
             usize existingOffset;
             if (LabelTableFind(&table, stmt->as.label.name, &existingOffset))
-                CodegenError(source, stmt->span, "duplicate label '%s'", stmt->as.label.name);
+                CodegenErrorFull(source, stmt->span,
+                                 HelpMessage("each label name must be unique -- pick a different name for one of them"),
+                                 LABEL_SYNTAX,
+                                 "duplicate label '%s'", stmt->as.label.name);
 
             table.entries[table.len++] = (LabelEntry){
                 .name = stmt->as.label.name,
@@ -209,16 +226,37 @@ CodegenResult GenerateCode(const Source *source, const StmtNode *stmts)
             continue;
 
         if (entry)
-            CodegenError(source, node->stmt.span, "multiple entry statements");
+            CodegenErrorFull(source, node->stmt.span,
+                             HelpMessage("a program can only have one 'entry' statement -- remove one of them"),
+                             ENTRY_SYNTAX, "multiple entry statements");
 
         entry = &node->stmt;
     }
 
     if (!entry)
-        CodegenError(source, (Span){.start = 0, .end = 0}, "no entry statement");
+        CodegenErrorFull(source, (Span){.start = 0, .end = 0},
+                         HelpMessage("every program needs exactly one 'entry' statement naming where execution starts"),
+                         ENTRY_SYNTAX, "no entry statement");
 
     if (!LabelTableFind(&table, entry->as.entry.label, &entryOffset))
-        CodegenError(source, entry->span, "entry refers to undefined label '%s'", entry->as.entry.label);
+    {
+        char *help;
+        if (table.len == 0)
+            help = HelpMessage("this program has no labels defined. Try defining a label called '%s'", entry->as.entry.label);
+        else
+        {
+            const char **labelNames = Alloc(table.len * sizeof(*labelNames));
+            for (usize i = 0; i < table.len; i++)
+                labelNames[i] = table.entries[i].name;
+
+            usize len = strlen(entry->as.entry.label);
+            usize maxDist = len / 3 < 1 ? 1 : len / 3;
+            const char *suggestion = SuggestClosest(entry->as.entry.label, labelNames, table.len, maxDist);
+            help = suggestion ? HelpMessage("did you mean '%s'?", suggestion) : NULL;
+            Free(labelNames);
+        }
+        CodegenErrorFull(source, entry->span, help, LABEL_SYNTAX, "entry refers to undefined label '%s'", entry->as.entry.label);
+    }
 
     LabelTableFree(&table);
 

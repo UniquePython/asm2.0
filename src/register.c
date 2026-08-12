@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-static const char *registers[] = {
+const char *const registers[] = {
     "eax",
     "ecx",
     "edx",
