@@ -90,16 +90,17 @@ label start:
 #### `move`
 
 ```
-move <number> to <register>;
+move <number|register> to <register>;
 ```
 
-Loads an unsigned integer literal into a register. Currently, the
-source of a `move` must be a numeric literal and the destination must
-be a register — see [Limitations](#limitations) for what's not yet
+Copies a value into a register. The source is either an unsigned
+integer literal or another register; the destination must always be a
+register — see [Limitations](#limitations) for what's not yet
 supported here.
 
 ```
 move 42 to edi;
+move edi to esi;
 ```
 
 #### `syscall`
@@ -219,10 +220,11 @@ automatically.
 asm2.0 is under active development. Some things you might reasonably
 expect are not implemented yet:
 
-* **`move` only supports an immediate-to-register form.**
-  Register-to-register moves (`move eax to ebx;`) and moving into a
-  numeric literal are not supported — the source must be a number and
-  the destination must be a register.
+* **`move` only supports immediate-to-register and
+  register-to-register forms.** The destination must always be a
+  register — moving into a numeric literal is not supported, and
+  there is no addressing of memory yet (no `[eax]`-style operands),
+  so nothing can be loaded from or stored to memory.
 * **Immediates for `move` are capped at 32 bits** (`0` to
   `4294967295`), even though integer literals themselves can be as
   large as 64 bits elsewhere in the language.
