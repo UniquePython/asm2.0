@@ -135,11 +135,15 @@ An operand is either:
 * **A number** — an unsigned decimal integer literal (e.g. `42`,
   `231`). No hexadecimal, binary, or negative literals are supported
   yet.
-* **A register** — one of the eight names listed below.
+* **A register** — one of the sixteen names listed below.
 
 ### Registers
 
-asm2.0 exposes the eight 32-bit x86-64 general-purpose registers:
+asm2.0 exposes all sixteen 32-bit-width x86-64 general-purpose
+registers: the original eight, plus `r8d`–`r15d`, which are only
+addressable using a REX prefix (added to the generated machine code
+automatically — the register names in your source are the only thing
+that changes).
 
 | Name  | Purpose (by x86-64 convention) |
 |-------|---------------------------------|
@@ -151,6 +155,7 @@ asm2.0 exposes the eight 32-bit x86-64 general-purpose registers:
 | `ebp` | base pointer                    |
 | `esi` | 2nd syscall argument            |
 | `edi` | 1st syscall argument            |
+| `r8d`–`r15d` | general purpose          |
 
 ### A Complete Example
 
@@ -230,11 +235,13 @@ expect are not implemented yet:
   large as 64 bits elsewhere in the language.
 * **No arithmetic, comparison, or control-flow statements** — there is
   currently no way to add, subtract, compare, jump, or branch.
-* **Only 8 of the 16 x86-64 general-purpose registers are exposed**
-  (the classic 32-bit-named subset: `eax`, `ecx`, `edx`, `ebx`, `esp`,
-  `ebp`, `esi`, `edi`). There's no access to `r8`–`r15`, and no way to
-  address the full 64-bit register width. This also means only the
-  first three syscall arguments are reachable (see `syscall` above).
+* **No access to the full 64-bit register width.** All sixteen
+  general-purpose registers are exposed, but only at their 32-bit
+  width (`eax`..`edi`, `r8d`..`r15d`) — there is no way to address a
+  register as a full 64-bit quantity (e.g. `rax`, `r8`) yet. This also
+  means only the first three syscall arguments are reachable (see
+  `syscall` above): the 4th–6th arguments are conventionally passed in
+  the 64-bit registers `r10`, `r8`, and `r9`, not their 32-bit forms.
 * **No negative number literals.**
 * **No hexadecimal or binary literal syntax** — only decimal.
 
