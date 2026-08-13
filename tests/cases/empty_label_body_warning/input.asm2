@@ -1,0 +1,8 @@
+entry start;
+
+label unused:
+
+label start:
+    move 60 to eax;
+    move 5 to edi;
+    syscall;

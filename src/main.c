@@ -27,9 +27,10 @@ int main(int argc, char **argv)
 
     TokenNode *tokens = Lex(&source, &lexDiags);
 
-    if (lexDiags.len > 0)
+    DiagsReportAll(&lexDiags, &source, "lexer");
+
+    if (lexDiags.nerrs > 0)
     {
-        DiagsReportAll(&lexDiags, &source, "lexer error");
         DiagsFree(&lexDiags);
         LexFree(&tokens);
         SourceFree(&source);
@@ -64,9 +65,10 @@ int main(int argc, char **argv)
 
     StmtNode *stmts = Parse(&source, tokens, &parseDiags);
 
-    if (parseDiags.len > 0)
+    DiagsReportAll(&parseDiags, &source, "parser");
+
+    if (parseDiags.nerrs > 0)
     {
-        DiagsReportAll(&parseDiags, &source, "parse error");
         DiagsFree(&parseDiags);
         DiagsFree(&lexDiags);
         LexFree(&tokens);

@@ -36,6 +36,18 @@ static const char *ResetColor(void)
     return DiagnosticUseColor() ? ANSI_RESET : "";
 }
 
+/*
+ * Severity-appropriate color for a diagnostic's "<prefix>:" and caret
+ * underline -- red for errors (matches the existing hardcoded
+ * behavior), yellow for warnings (distinct from the yellow already
+ * used for "syntax:" lines, since they never appear on the same
+ * line as a prefix or underline).
+ */
+static const char *SeverityColor(Severity severity)
+{
+    return severity == SEVERITY_WARNING ? ANSI_YELLOW : ANSI_RED;
+}
+
 static void ReportSimple(const char *prefix, int exitCode, const char *fmt, va_list args)
 {
     fprintf(stderr, "%s%s:%s ", Color(ANSI_RED), prefix, ResetColor());
@@ -98,13 +110,18 @@ static void PrintGutter(FILE *out, u32 line, u32 width, bool with_number)
  * exit -- shared by the fatal single-error path (ReportPositioned) and
  * the Diags batch-report path.
  *
+ * `severity` controls only the color of the "<prefix>:" label and the
+ * caret underline (red for errors, yellow for warnings) -- `prefix`
+ * itself still carries the actual wording (e.g. "codegen error",
+ * "parser warning"), same as before this parameter was added.
+ *
  * `help` and `syntax` are both optional (pass NULL for either/both) and
  * are printed flush-left, after the caret block, in that order -- the
  * specific fix (help) before the general shape (syntax). Neither is
  * freed here; that's the caller's responsibility (see CodegenErrorFull
  * and DiagsFree).
  */
-static void PrintPositioned(const char *prefix, const Source *source, Span span, const char *message, const char *help, const char *syntax)
+static void PrintPositioned(const char *prefix, Severity severity, const Source *source, Span span, const char *message, const char *help, const char *syntax)
 {
     u32 line;
     u32 col;
@@ -112,7 +129,7 @@ static void PrintPositioned(const char *prefix, const Source *source, Span span,
     PositionFromOffset(source, span.start, &line, &col);
 
     /* <prefix>: <message> */
-    fprintf(stderr, "%s%s:%s %s\n", Color(ANSI_RED), prefix, ResetColor(), message);
+    fprintf(stderr, "%s%s:%s %s\n", Color(SeverityColor(severity)), prefix, ResetColor(), message);
 
     /* --> filepath:line:col */
     fprintf(
@@ -157,7 +174,7 @@ static void PrintPositioned(const char *prefix, const Source *source, Span span,
     if (spanLen == 0)
         spanLen = 1;
 
-    fprintf(stderr, "%s", Color(ANSI_RED));
+    fprintf(stderr, "%s", Color(SeverityColor(severity)));
     for (u32 i = 0; i < spanLen; i++)
         fputc('^', stderr);
     fprintf(stderr, "%s\n", ResetColor());
@@ -186,7 +203,7 @@ static void ReportPositioned(const char *prefix, int exitCode, const Source *sou
 
     vsnprintf(message, len, fmt, args);
 
-    PrintPositioned(prefix, source, span, message, help, syntax);
+    PrintPositioned(prefix, SEVERITY_ERROR, source, span, message, help, syntax);
 
     /*
      * This path is fatal (we're about to exit), so `help` -- which is
@@ -265,6 +282,7 @@ void DiagsInit(Diags *diags, usize max)
     diags->cap = 0;
     diags->max = max;
     diags->nerrs = 0;
+    diags->nwarnings = 0;
 }
 
 void DiagsFree(Diags *diags)
@@ -283,20 +301,29 @@ void DiagsFree(Diags *diags)
 }
 
 /*
- * Shared implementation behind DiagsPush and DiagsPushFull. `help` and
- * `syntax` follow the same ownership rules documented on
- * DiagsPushFull / CodegenErrorFull: `help` is either NULL or a
- * heap-allocated string whose ownership transfers into the stored
- * DiagEntry (freed later by DiagsFree); `syntax` is either NULL or a
- * borrowed static literal, stored as-is, never freed.
+ * Shared implementation behind DiagsPush, DiagsPushFull,
+ * DiagsPushWarning, and DiagsPushWarningFull. `help` and `syntax`
+ * follow the same ownership rules documented on DiagsPushFull /
+ * CodegenErrorFull: `help` is either NULL or a heap-allocated string
+ * whose ownership transfers into the stored DiagEntry (freed later by
+ * DiagsFree); `syntax` is either NULL or a borrowed static literal,
+ * stored as-is, never freed.
+ *
+ * `severity` determines which counter (nerrs or nwarnings) is bumped.
+ * Both counters count every call, including ones dropped for being
+ * over capacity -- see DiagsReportAll's "N further ... suppressed"
+ * logic, which relies on that.
  *
  * If the diagnostic is dropped because `diags` is at capacity, `help`
  * is freed immediately here (its only owner, this call, is discarding
  * it) so it doesn't leak.
  */
-static void DiagsPushImpl(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, va_list args)
+static void DiagsPushImpl(Diags *diags, Span span, Severity severity, char *help, const char *syntax, const char *fmt, va_list args)
 {
-    diags->nerrs++;
+    if (severity == SEVERITY_WARNING)
+        diags->nwarnings++;
+    else
+        diags->nerrs++;
 
     if (diags->max > 0 && diags->len >= diags->max)
     {
@@ -336,6 +363,7 @@ static void DiagsPushImpl(Diags *diags, Span span, char *help, const char *synta
 
     diags->entries[diags->len] = (DiagEntry){
         .span = span,
+        .severity = severity,
         .message = message,
         .help = help,
         .syntax = syntax,
@@ -347,7 +375,7 @@ void DiagsPush(Diags *diags, Span span, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    DiagsPushImpl(diags, span, NULL, NULL, fmt, args);
+    DiagsPushImpl(diags, span, SEVERITY_ERROR, NULL, NULL, fmt, args);
     va_end(args);
 }
 
@@ -355,21 +383,77 @@ void DiagsPushFull(Diags *diags, Span span, char *help, const char *syntax, cons
 {
     va_list args;
     va_start(args, fmt);
-    DiagsPushImpl(diags, span, help, syntax, fmt, args);
+    DiagsPushImpl(diags, span, SEVERITY_ERROR, help, syntax, fmt, args);
     va_end(args);
 }
 
+void DiagsPushWarning(Diags *diags, Span span, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    DiagsPushImpl(diags, span, SEVERITY_WARNING, NULL, NULL, fmt, args);
+    va_end(args);
+}
+
+void DiagsPushWarningFull(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    DiagsPushImpl(diags, span, SEVERITY_WARNING, help, syntax, fmt, args);
+    va_end(args);
+}
+
+/*
+ * `prefix` here is a bare stage name ("lexer", "parser") -- unlike
+ * CodegenError's hardcoded "codegen error", DiagsReportAll prints
+ * entries of mixed severity, so it appends " error" / " warning"
+ * itself per-entry rather than baking one word into a caller-supplied
+ * string. This intentionally changes what callers pass for `prefix`
+ * (previously the full "lexer error" / "parse error" strings) -- see
+ * the updated call sites in main.c.
+ */
 void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix)
 {
-    for (usize i = 0; i < diags->len; i++)
-        PrintPositioned(prefix, source, diags->entries[i].span, diags->entries[i].message,
-                        diags->entries[i].help, diags->entries[i].syntax);
+    usize storedErrs = 0;
+    usize storedWarnings = 0;
 
-    if (diags->nerrs > diags->len)
+    for (usize i = 0; i < diags->len; i++)
     {
-        usize suppressed = diags->nerrs - diags->len;
-        fprintf(stderr, "%s%s:%s " U64_FMT " further error%s suppressed\n",
+        const DiagEntry *entry = &diags->entries[i];
+
+        if (entry->severity == SEVERITY_WARNING)
+            storedWarnings++;
+        else
+            storedErrs++;
+
+        char label[64];
+        snprintf(label, sizeof(label), "%s %s", prefix, entry->severity == SEVERITY_WARNING ? "warning" : "error");
+
+        PrintPositioned(label, entry->severity, source, entry->span, entry->message,
+                        entry->help, entry->syntax);
+    }
+
+    /*
+     * entries[] holds both severities under one shared cap/max, so
+     * "suppressed" has to be computed per-severity against the
+     * counters DiagsPushImpl bumped unconditionally (nerrs/nwarnings)
+     * versus what actually made it into storage (storedErrs/
+     * storedWarnings) -- diags->len alone (mixed severity) is no
+     * longer the right thing to compare either counter against.
+     */
+    if (diags->nerrs > storedErrs)
+    {
+        usize suppressed = diags->nerrs - storedErrs;
+        fprintf(stderr, "%s%s error:%s " U64_FMT " further error%s suppressed\n",
                 Color(ANSI_RED), prefix, ResetColor(),
+                (u64)suppressed, suppressed == 1 ? "" : "s");
+    }
+
+    if (diags->nwarnings > storedWarnings)
+    {
+        usize suppressed = diags->nwarnings - storedWarnings;
+        fprintf(stderr, "%s%s warning:%s " U64_FMT " further warning%s suppressed\n",
+                Color(ANSI_YELLOW), prefix, ResetColor(),
                 (u64)suppressed, suppressed == 1 ? "" : "s");
     }
 }

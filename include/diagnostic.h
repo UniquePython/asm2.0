@@ -5,6 +5,12 @@
 #include "span.h"
 #include "source.h"
 
+typedef enum severity_t
+{
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+} Severity;
+
 void Error(const char *fmt, ...);
 void InternalError(const char *fmt, ...);
 void CodegenError(const Source *source, Span span, const char *fmt, ...);
@@ -36,6 +42,9 @@ char *HelpMessage(const char *fmt, ...);
 typedef struct diag_entry_t
 {
     Span span;
+    Severity severity;  /* SEVERITY_ERROR or SEVERITY_WARNING -- controls
+                         * both the printed prefix color and whether this
+                         * entry counts toward Diags::nerrs. */
     char *message;      /* owned, heap-allocated, already formatted */
     char *help;         /* owned */
     const char *syntax; /* borrowed literal from syntax.h */
@@ -44,16 +53,35 @@ typedef struct diag_entry_t
 typedef struct diags_t
 {
     DiagEntry *entries;
-    usize len;   /* number of diagnostics actually stored (<= max) */
-    usize cap;   /* allocated capacity of entries[] (<= max) */
-    usize max;   /* storage cap; 0 means unlimited */
-    usize nerrs; /* total DiagsPush calls, including suppressed ones */
+    usize len;       /* number of diagnostics actually stored (<= max) */
+    usize cap;       /* allocated capacity of entries[] (<= max) */
+    usize max;       /* storage cap; 0 means unlimited */
+    usize nerrs;     /* total error-severity DiagsPush calls, including
+                      * suppressed ones -- callers should key pipeline
+                      * abort decisions off this, NOT off len, since len
+                      * also counts warnings and warnings must not halt
+                      * the pipeline. */
+    usize nwarnings; /* total warning-severity DiagsPush calls, including
+                      * suppressed ones. Purely informational -- nothing
+                      * in this module treats it as fatal. */
 } Diags;
 
 void DiagsInit(Diags *diags, usize max);
 void DiagsFree(Diags *diags);
+
+/*
+ * DiagsPush / DiagsPushFull push an ERROR-severity diagnostic.
+ * DiagsPushWarning / DiagsPushWarningFull push a WARNING-severity one.
+ * All four share the same storage, capacity, and reporting path --
+ * only the severity (and therefore which counter it bumps, and which
+ * color it prints in) differs. See DiagsPushFull's existing doc
+ * comment for the `help` / `syntax` ownership rules; they apply
+ * identically to the warning variants.
+ */
 void DiagsPush(Diags *diags, Span span, const char *fmt, ...);
 void DiagsPushFull(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, ...);
+void DiagsPushWarning(Diags *diags, Span span, const char *fmt, ...);
+void DiagsPushWarningFull(Diags *diags, Span span, char *help, const char *syntax, const char *fmt, ...);
 
 void DiagsReportAll(const Diags *diags, const Source *source, const char *prefix);
 

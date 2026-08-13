@@ -216,6 +216,46 @@ static void ParserSynchronize(Parser *p)
 }
 
 /*
+ * Post-pass: warn about labels with no statements between them and
+ * whatever comes next (the next label, or EOF). `entry` doesn't count
+ * as body content -- it's a standalone declaration that can legally
+ * appear anywhere and isn't part of any label's body, so a label
+ * immediately followed only by `entry` statement(s) and then another
+ * label (or EOF) is still considered empty.
+ *
+ * Runs over the flat, already-parsed statement list rather than
+ * during parsing itself, since "empty body" is a property of what
+ * comes *between* two statements, not of any single statement in
+ * isolation -- the parser doesn't have that context mid-parse, but by
+ * the time Parse() is about to return, the whole list is available.
+ *
+ * This is a warning, not an error: DiagsPushWarningFull does not
+ * trigger ParserSynchronize and does not stop `stmts` from being
+ * returned and used -- see DiagsPushImpl's severity handling and
+ * main.c's `nerrs`-gated (not `len`-gated) abort check.
+ */
+static void CheckEmptyLabelBodies(const StmtNode *stmts, Diags *diags)
+{
+    for (const StmtNode *node = stmts; node; node = node->next)
+    {
+        if (node->stmt.kind != STMT_LABEL)
+            continue;
+
+        const StmtNode *next = node->next;
+        while (next && next->stmt.kind == STMT_ENTRY)
+            next = next->next;
+
+        bool empty = (next == NULL) || (next->stmt.kind == STMT_LABEL);
+
+        if (empty)
+            DiagsPushWarningFull(diags, node->stmt.span,
+                                 HelpMessage("add a statement below it, e.g. 'syscall;', or remove the label if it's unused"),
+                                 NULL,
+                                 "label '%s' has an empty body", node->stmt.as.label.name);
+    }
+}
+
+/*
  * program ::= statement*
  */
 StmtNode *Parse(const Source *source, TokenNode *tokens, Diags *diags)
@@ -255,6 +295,8 @@ StmtNode *Parse(const Source *source, TokenNode *tokens, Diags *diags)
 
         tail = node;
     }
+
+    CheckEmptyLabelBodies(head, diags);
 
     return head;
 }

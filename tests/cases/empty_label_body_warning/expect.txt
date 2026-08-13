@@ -1,0 +1,4 @@
+stage: compile
+exit: 0
+stderr_contains: parser warning: label 'unused' has an empty body
+run_exit: 5
