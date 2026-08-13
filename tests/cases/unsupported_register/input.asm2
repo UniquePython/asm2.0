@@ -1,5 +1,5 @@
 entry start;
 
 label start:
-    move 5 to r8d;
+    move 5 to rax;
     syscall;

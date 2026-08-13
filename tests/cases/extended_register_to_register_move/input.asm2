@@ -1,0 +1,8 @@
+entry start;
+
+label start:
+    move 231 to eax;
+    move 13 to ecx;
+    move ecx to r12d;
+    move r12d to edi;
+    syscall;

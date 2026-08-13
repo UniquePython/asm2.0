@@ -17,7 +17,7 @@ Register ResolveRegisterOperand(const Source *source, const Operand *operand)
     {
         usize len = strlen(operand->as.identifier);
         usize maxDist = len / 3 < 1 ? 1 : len / 3;
-        const char *suggestion = SuggestClosest(operand->as.identifier, registers, 8, maxDist);
+        const char *suggestion = SuggestClosest(operand->as.identifier, registers, NREGS, maxDist);
 
         CodegenErrorFull(source, operand->span,
                          suggestion ? HelpMessage("did you mean '%s'?", suggestion) : NULL,
@@ -72,15 +72,41 @@ static Encoded EncodeSyscallStmt(void)
  *  |Mod| Reg | R/M |
  *  +---+-----+-----+
  *
- * reg and rm are raw 3-bit register indices (0-7 for our current
- * register set). Caller decides which logical operand (src/dest)
- * goes in which field -- see the opcode comment in
- * EncodeMoveRegToRegStmt.
+ * reg and rm are raw 3-bit fields (0-7) -- callers must pass the
+ * result of RegisterLowBits, not a raw Register, since a Register can
+ * now be as large as 15 (r8d..r15d) and would silently corrupt
+ * adjacent bits otherwise. The missing high bit for such registers is
+ * supplied separately via REX -- see BuildRex. Caller decides which
+ * logical operand (src/dest) goes in which field -- see the opcode
+ * comment in EncodeMoveRegToRegStmt.
  */
-static u8 BuildModRM(Register reg, Register rm)
+static u8 BuildModRM(u8 reg, u8 rm)
 {
-    return (u8)(0xC0 | ((u8)reg << 3) | (u8)rm);
+    return (u8)(0xC0 | (reg << 3) | rm);
     //          ^^^^ Mod=11, fixed
+}
+
+/*
+ * REX prefix, W=0 (32-bit operand size) and X=0 (no SIB/memory
+ * addressing yet) -- only R and B are ever set for now.
+ *
+ *   7 6 5 4   3   2   1   0
+ *  +-------+---+---+---+---+
+ *  | 0100  | W | R | X | B |
+ *  +-------+---+---+---+---+
+ *
+ * reg is the register occupying ModRM's Reg field (or, for the +rd
+ * opcode-embedded-register form, N/A -- see BuildRexForOpcodeReg);
+ * rm is the register occupying ModRM's R/M field. Only call this when
+ * at least one of them actually needs it (RegisterNeedsRex) -- when
+ * neither does, no REX byte should be emitted at all.
+ */
+static u8 BuildRex(Register reg, Register rm)
+{
+    u8 r = RegisterNeedsRex(reg) ? 1 : 0;
+    u8 b = RegisterNeedsRex(rm) ? 1 : 0;
+
+    return (u8)(0x40 | (r << 2) | b);
 }
 
 /*
@@ -92,15 +118,36 @@ static u8 BuildModRM(Register reg, Register rm)
  * this same opcode/field assignment, with R/M becoming a memory
  * operand instead of a register. The reverse direction, storing a
  * register into memory, will need opcode 89 /r later.)
+ *
+ * When either operand is one of r8d..r15d, a REX prefix (REX.R for
+ * the dest/Reg field, REX.B for the src/R/M field) is prepended.
+ * ModRM's fields always carry only the low 3 bits of each register
+ * either way -- REX supplies the missing high bit, it doesn't change
+ * what ModRM itself contains.
  */
 static Encoded EncodeMoveRegToRegStmt(const Source *source, const Operand *src, const Operand *dest)
 {
     Register srcReg = ResolveRegisterOperand(source, src);
     Register destReg = ResolveRegisterOperand(source, dest);
 
+    u8 modrm = BuildModRM(RegisterLowBits(destReg), RegisterLowBits(srcReg));
+
+    if (RegisterNeedsRex(srcReg) || RegisterNeedsRex(destReg))
+    {
+        u8 *bytes = Alloc(3);
+        bytes[0] = BuildRex(destReg, srcReg);
+        bytes[1] = 0x8B;
+        bytes[2] = modrm;
+
+        return (Encoded){
+            .bytes = bytes,
+            .len = 3,
+        };
+    }
+
     u8 *bytes = Alloc(2);
     bytes[0] = 0x8B;
-    bytes[1] = BuildModRM(destReg, srcReg);
+    bytes[1] = modrm;
 
     return (Encoded){
         .bytes = bytes,
@@ -113,6 +160,13 @@ static Encoded EncodeMoveRegToRegStmt(const Source *source, const Operand *src, 
  * Opcode: B8 + register index, followed by the 4-byte little-endian
  * immediate. Immediates that don't fit in 32 bits are not supported
  * yet.
+ *
+ * The destination register is embedded directly in the opcode's low
+ * 3 bits (a "+rd" encoding -- there is no ModRM byte here at all).
+ * When the destination is one of r8d..r15d, its high bit doesn't fit
+ * in the opcode byte, so a REX prefix (REX.B) is prepended to supply
+ * it -- the same role REX.B plays for ModRM's R/M field, just applied
+ * to this opcode-embedded register instead.
  */
 static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
 {
@@ -129,10 +183,27 @@ static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
                          HelpMessage("the largest value 'move' currently supports is %u", UINT32_MAX),
                          MOVE_SYNTAX, "immediate value is too large to fit in 32 bits");
 
-    u8 *bytes = Alloc(5);
-    bytes[0] = (u8)(0xB8 + (u8)destReg);
-
     u32 imm = (u32)src->as.number;
+    u8 opcode = (u8)(0xB8 + RegisterLowBits(destReg));
+
+    if (RegisterNeedsRex(destReg))
+    {
+        u8 *bytes = Alloc(6);
+        bytes[0] = 0x40 | 0x1; // REX.B -- extends the opcode-embedded register
+        bytes[1] = opcode;
+        bytes[2] = (u8)(imm & 0xFF);
+        bytes[3] = (u8)((imm >> 8) & 0xFF);
+        bytes[4] = (u8)((imm >> 16) & 0xFF);
+        bytes[5] = (u8)((imm >> 24) & 0xFF);
+
+        return (Encoded){
+            .bytes = bytes,
+            .len = 6,
+        };
+    }
+
+    u8 *bytes = Alloc(5);
+    bytes[0] = opcode;
     bytes[1] = (u8)(imm & 0xFF);
     bytes[2] = (u8)((imm >> 8) & 0xFF);
     bytes[3] = (u8)((imm >> 16) & 0xFF);
