@@ -65,19 +65,62 @@ static Encoded EncodeSyscallStmt(void)
 }
 
 /*
+ * ModRM byte, Mod=11 (register-direct) only -- no memory operands yet.
+ *
+ *   7 6 5 4 3 2 1 0
+ *  +---+-----+-----+
+ *  |Mod| Reg | R/M |
+ *  +---+-----+-----+
+ *
+ * reg and rm are raw 3-bit register indices (0-7 for our current
+ * register set). Caller decides which logical operand (src/dest)
+ * goes in which field -- see the opcode comment in
+ * EncodeMoveRegToRegStmt.
+ */
+static u8 BuildModRM(Register reg, Register rm)
+{
+    return (u8)(0xC0 | ((u8)reg << 3) | (u8)rm);
+    //          ^^^^ Mod=11, fixed
+}
+
+/*
+ * move <register> to <register> -> mov r32, r/m32
+ * Opcode: 8B /r
+ *   ModRM.Reg = dest, ModRM.R/M = src
+ *
+ * (Chosen so that a future 'move [addr] to reg' -- a load -- reuses
+ * this same opcode/field assignment, with R/M becoming a memory
+ * operand instead of a register. The reverse direction, storing a
+ * register into memory, will need opcode 89 /r later.)
+ */
+static Encoded EncodeMoveRegToRegStmt(const Source *source, const Operand *src, const Operand *dest)
+{
+    Register srcReg = ResolveRegisterOperand(source, src);
+    Register destReg = ResolveRegisterOperand(source, dest);
+
+    u8 *bytes = Alloc(2);
+    bytes[0] = 0x8B;
+    bytes[1] = BuildModRM(destReg, srcReg);
+
+    return (Encoded){
+        .bytes = bytes,
+        .len = 2,
+    };
+}
+
+/*
  * move <number> to <register> -> mov reg32, imm32
  * Opcode: B8 + register index, followed by the 4-byte little-endian
- * immediate. Register-to-register moves and immediates that don't fit
- * in 32 bits are not supported yet.
+ * immediate. Immediates that don't fit in 32 bits are not supported
+ * yet.
  */
 static Encoded EncodeMoveStmt(const Source *source, const Stmt *stmt)
 {
     const Operand *src = &stmt->as.move.src;
     const Operand *dest = &stmt->as.move.dest;
 
-    if (src->kind != OPERAND_NUMBER)
-        CodegenErrorFull(source, src->span, NULL, MOVE_SYNTAX,
-                         "only numeric sources are supported for 'move' right now");
+    if (src->kind == OPERAND_IDENTIFIER)
+        return EncodeMoveRegToRegStmt(source, src, dest);
 
     Register destReg = ResolveRegisterOperand(source, dest);
 

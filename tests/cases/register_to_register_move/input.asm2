@@ -1,5 +1,7 @@
 entry start;
 
 label start:
-    move eax to ebx;
+    move 231 to eax;
+    move 7 to ecx;
+    move ecx to edi;
     syscall;

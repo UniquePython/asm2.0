@@ -17,7 +17,7 @@
  */
 
 #define LABEL_SYNTAX "label <name>:"
-#define MOVE_SYNTAX "move <number> to <register>;"
+#define MOVE_SYNTAX "move <number|register> to <register>;"
 #define SYSCALL_SYNTAX "syscall;"
 #define ENTRY_SYNTAX "entry <label>;"
 
